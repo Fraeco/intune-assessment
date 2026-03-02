@@ -1,0 +1,24 @@
+# ── Secrets ────────────────────────────────────────────────────────────────
+# Never commit the live config with client secret
+Config/AppConfig.json
+
+# ── Generated output ────────────────────────────────────────────────────────
+Exports/
+Baseline/baseline-cache.json
+
+# ── OS / editor artefacts ───────────────────────────────────────────────────
+Thumbs.db
+.DS_Store
+desktop.ini
+*.tmp
+
+# ── PowerShell temp ─────────────────────────────────────────────────────────
+*.ps1xml
+
+# ── Claude artefacts folder──────────────────────────────────────────────────
+.claude/
+
+# ── vscode artefacts folder──────────────────────────────────────────────────
+.vscode/
+
+informational/

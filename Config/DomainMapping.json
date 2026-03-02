@@ -1,0 +1,63 @@
+{
+  "_comment": "Maps Intune settings to the 5 eVri assessment domains. Lookup priority: byCategoryGuid > byPolicyNamePrefix > bySettingPathKeyword. Add category GUIDs discovered during first runs to byCategoryGuid for the most precise mapping.",
+  "validDomains": [
+    "Endpoint Security",
+    "Device Management",
+    "Compliance & Governance",
+    "Application Lifecycle",
+    "Operations & Monitoring"
+  ],
+  "byCategoryGuid": {
+    "_comment": "Populate after first run — GUIDs appear in the 'Baseline Category' column of the export. Example: '0a1347d2-90c0-407a-baa0-e4859260532a': 'Endpoint Security'"
+  },
+  "byPolicyNamePrefix": {
+    "SBZ-Win-L1-ES-": "Endpoint Security",
+    "SBZ-Win-L2-ES-": "Endpoint Security",
+    "SBZ-Win-L3-ES-": "Endpoint Security",
+    "SBZ-Win-L4-ES-": "Endpoint Security",
+    "SBZ-Win-Custom-ES-": "Endpoint Security",
+    "SBZ-Win-L1-DM-": "Device Management",
+    "SBZ-Win-L2-DM-": "Device Management",
+    "SBZ-Win-L3-DM-": "Device Management",
+    "SBZ-Win-L4-DM-": "Device Management",
+    "SBZ-Win-Custom-DM-": "Device Management",
+    "SBZ-Win-L1-CG-": "Compliance & Governance",
+    "SBZ-Win-L2-CG-": "Compliance & Governance",
+    "SBZ-Win-Custom-CG-": "Compliance & Governance",
+    "SBZ-Win-Custom-AL-": "Application Lifecycle",
+    "SBZ-Win-L1-OM-": "Operations & Monitoring",
+    "SBZ-Win-Custom-OM-": "Operations & Monitoring",
+    "SBZ-Win-L1-SC-AppPackageDeployment-D-": "Application Lifecycle",
+    "SBZ-Win-L1-SC-Audit-EventLog-D-": "Operations & Monitoring",
+    "SBZ-Win-L1-SC-ConfigRefresh-D-": "Device Management",
+    "SBZ-Win-L1-SC-SecurityHardening-D-": "Endpoint Security",
+    "SBZ-Win-L1-SC-LocalSecurityPolicies-D-": "Endpoint Security"
+  },
+  "bySettingPathKeyword": {
+    "BitLocker": "Endpoint Security",
+    "Firewall": "Endpoint Security",
+    "Windows Defender": "Endpoint Security",
+    "Microsoft Defender": "Endpoint Security",
+    "Attack Surface Reduction": "Endpoint Security",
+    "LAPS": "Endpoint Security",
+    "Local Administrator Password": "Endpoint Security",
+    "Windows Hello": "Endpoint Security",
+    "Credential Guard": "Endpoint Security",
+    "Personal Data Encryption": "Endpoint Security",
+    "Device Guard": "Endpoint Security",
+    "AppLocker": "Endpoint Security",
+    "Exploit Guard": "Endpoint Security",
+    "Smart Screen": "Endpoint Security",
+    "SmartScreen": "Endpoint Security",
+    "Windows Update": "Operations & Monitoring",
+    "Update Ring": "Operations & Monitoring",
+    "Autopatch": "Operations & Monitoring",
+    "Delivery Optimization": "Operations & Monitoring",
+    "Diagnostic": "Operations & Monitoring",
+    "Compliance": "Compliance & Governance",
+    "Device Restriction": "Device Management",
+    "Device Installation": "Device Management",
+    "Printer": "Device Management",
+    "Enrollment": "Device Management"
+  }
+}
