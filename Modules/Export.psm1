@@ -12,12 +12,14 @@ Set-StrictMode -Version Latest
 # Column order must match the reference file schema exactly
 $script:CsvColumns = @(
     'BaselinePolicyName',
+    'BaselinePolicyTemplate',
     'BaselineSetting',
     'BaselineCategory',
     'BaselineDomain',
     'BaselineValue',
     'Result',
     'PolicyName',
+    'CustomerSetting',
     'PolicyTemplate',
     'PolicyValue',
     'ComparisonCategory',
@@ -25,7 +27,7 @@ $script:CsvColumns = @(
     'Description'
 )
 
-$script:CsvHeader = '"Baseline Policy Name";"Baseline Setting";"Baseline Category";"Baseline Domain";"Baseline Setting Value";"Result";"Policy Name";"Policy Template";"Policy Value";"Comparison Category";"Comparison Domain";"Description"'
+$script:CsvHeader = '"Baseline Policy Name";"Baseline Policy Template";"Baseline Setting";"Baseline Category";"Baseline Domain";"Baseline Setting Value";"Result";"Policy Name";"Customer Setting";"Policy Template";"Policy Value";"Comparison Category";"Comparison Domain";"Description"'
 
 # ---------------------------------------------------------------------------
 # Public API

@@ -93,19 +93,21 @@ function Compare-TenantSettings {
         $first        = $group[0]
 
         $results.Add([ordered]@{
-            BaselinePolicyName = ''
-            BaselineSetting    = ''
-            BaselineCategory   = ''
-            BaselineDomain     = ''
-            BaselineValue      = ''
-            Result             = 'Extra'
-            PolicyName         = $policyNames
-            PolicyTemplate     = $templates
-            PolicyValue        = $policyValues
-            ComparisonCategory = $first.CategoryId
-            ComparisonDomain   = $first.Domain
-            Description        = $first.Description
-            DefinitionId       = $first.DefinitionId   # internal, not in CSV
+            BaselinePolicyName     = ''
+            BaselinePolicyTemplate = ''
+            BaselineSetting        = ''
+            BaselineCategory       = ''
+            BaselineDomain         = ''
+            BaselineValue          = ''
+            Result                 = 'Extra'
+            PolicyName             = $policyNames
+            CustomerSetting        = $first.SettingPath
+            PolicyTemplate         = $templates
+            PolicyValue            = $policyValues
+            ComparisonCategory     = $first.CategoryId
+            ComparisonDomain       = $first.Domain
+            Description            = $first.Description
+            DefinitionId           = $first.DefinitionId   # internal, not in CSV
         })
     }
 
@@ -132,19 +134,21 @@ function Build-ComparisonRow {
 
     if ($CustomerMatches.Count -eq 0) {
         return [ordered]@{
-            BaselinePolicyName = $BaselineSetting.PolicyName
-            BaselineSetting    = $BaselineSetting.SettingPath
-            BaselineCategory   = $BaselineSetting.CategoryId
-            BaselineDomain     = $BaselineSetting.Domain
-            BaselineValue      = $BaselineSetting.Value
-            Result             = 'Missing'
-            PolicyName         = ''
-            PolicyTemplate     = ''
-            PolicyValue        = ''
-            ComparisonCategory = ''
-            ComparisonDomain   = ''
-            Description        = $BaselineSetting.Description
-            DefinitionId       = $BaselineSetting.DefinitionId
+            BaselinePolicyName     = $BaselineSetting.PolicyName
+            BaselinePolicyTemplate = $BaselineSetting.PolicyTemplate
+            BaselineSetting        = $BaselineSetting.SettingPath
+            BaselineCategory       = $BaselineSetting.CategoryId
+            BaselineDomain         = $BaselineSetting.Domain
+            BaselineValue          = $BaselineSetting.Value
+            Result                 = 'Missing'
+            PolicyName             = ''
+            CustomerSetting        = ''
+            PolicyTemplate         = ''
+            PolicyValue            = ''
+            ComparisonCategory     = ''
+            ComparisonDomain       = ''
+            Description            = $BaselineSetting.Description
+            DefinitionId           = $BaselineSetting.DefinitionId
         }
     }
 
@@ -160,19 +164,21 @@ function Build-ComparisonRow {
     $result   = if ($anyMatch) { 'Compliant' } else { 'Conflict' }
 
     return [ordered]@{
-        BaselinePolicyName = $BaselineSetting.PolicyName
-        BaselineSetting    = $BaselineSetting.SettingPath
-        BaselineCategory   = $BaselineSetting.CategoryId
-        BaselineDomain     = $BaselineSetting.Domain
-        BaselineValue      = $BaselineSetting.Value
-        Result             = $result
-        PolicyName         = $policyNames
-        PolicyTemplate     = $templates
-        PolicyValue        = $policyValues
-        ComparisonCategory = $compCatId
-        ComparisonDomain   = $compDomain
-        Description        = $BaselineSetting.Description
-        DefinitionId       = $BaselineSetting.DefinitionId
+        BaselinePolicyName     = $BaselineSetting.PolicyName
+        BaselinePolicyTemplate = $BaselineSetting.PolicyTemplate
+        BaselineSetting        = $BaselineSetting.SettingPath
+        BaselineCategory       = $BaselineSetting.CategoryId
+        BaselineDomain         = $BaselineSetting.Domain
+        BaselineValue          = $BaselineSetting.Value
+        Result                 = $result
+        PolicyName             = $policyNames
+        CustomerSetting        = $CustomerMatches[0].SettingPath
+        PolicyTemplate         = $templates
+        PolicyValue            = $policyValues
+        ComparisonCategory     = $compCatId
+        ComparisonDomain       = $compDomain
+        Description            = $BaselineSetting.Description
+        DefinitionId           = $BaselineSetting.DefinitionId
     }
 }
 
