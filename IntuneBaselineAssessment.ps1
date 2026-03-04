@@ -5,9 +5,9 @@
     the eVri hardened baseline and exports a diff CSV for the assessment report.
 
 .DESCRIPTION
-    Sprint 1 scope: Settings Catalog policies only.
-    Future sprints will add: Endpoint Security (intents), Device Configuration,
-    Security Baselines, Admin Templates, Compliance Policies.
+    Sprint 2 scope: Settings Catalog, Endpoint Security (intents), Device
+    Configuration, and Admin Templates policies.
+    Future sprints: Security Baselines, Compliance Policies.
 
 .PARAMETER CustomerTenantId
     Azure AD Tenant ID (GUID) of the customer tenant to assess.
@@ -90,7 +90,10 @@ param(
 
     [switch]$UseBaselineCache,
     [switch]$RefreshBaseline,
-    [switch]$GenerateReportData
+    [switch]$GenerateReportData,
+
+    [ValidateSet('SettingsCatalog', 'EndpointSecurity', 'DeviceConfig', 'AdminTemplates')]
+    [string[]]$PolicyTypes = @('SettingsCatalog', 'EndpointSecurity', 'DeviceConfig', 'AdminTemplates')
 )
 
 Set-StrictMode -Version Latest
@@ -101,8 +104,8 @@ $ErrorActionPreference = 'Stop'
 # ─────────────────────────────────────────────────────────────────────────────
 Write-Host ''
 Write-Host '╔══════════════════════════════════════════════════════╗' -ForegroundColor Cyan
-Write-Host '║    Intune Baseline Assessment Tool  v0.1.0           ║' -ForegroundColor Cyan
-Write-Host '║    Sprint 1 — Settings Catalog                       ║' -ForegroundColor Cyan
+Write-Host '║    Intune Baseline Assessment Tool  v0.2.0           ║' -ForegroundColor Cyan
+Write-Host '║    Sprint 2 — +ES / DevConfig / AdminTemplates       ║' -ForegroundColor Cyan
 Write-Host '╚══════════════════════════════════════════════════════╝' -ForegroundColor Cyan
 Write-Host "  Customer      : $CustomerName" -ForegroundColor White
 Write-Host "  Tenant ID     : $CustomerTenantId" -ForegroundColor White
@@ -117,7 +120,7 @@ Write-Host ''
 # ─────────────────────────────────────────────────────────────────────────────
 $moduleRoot = Join-Path $PSScriptRoot 'Modules'
 
-foreach ($moduleName in @('Auth', 'GraphAPI', 'PolicyReader', 'Comparison', 'Enrichment', 'Export')) {
+foreach ($moduleName in @('Auth', 'GraphAPI', 'PolicyReader', 'EndpointSecurityReader', 'DeviceConfigReader', 'AdminTemplateReader', 'Comparison', 'Enrichment', 'Export')) {
     $modulePath = Join-Path $moduleRoot "$moduleName.psm1"
     if (-not (Test-Path $modulePath)) {
         throw "Required module not found: $modulePath"
@@ -153,9 +156,47 @@ $domainMappingFile = Join-Path $ConfigPath 'DomainMapping.json'
 Initialize-DomainMapping -MappingPath $domainMappingFile
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Step 1 — Baseline settings
+# Private helper — fetches all requested policy types and aggregates results
 # ─────────────────────────────────────────────────────────────────────────────
-Write-Host '[1/4] Baseline tenant — Settings Catalog' -ForegroundColor Yellow
+function Get-AllPolicySettings {
+    param(
+        [string]   $Token,
+        [string]   $BaseUrl,
+        [string[]] $PolicyFilter = @(),
+        [string[]] $Types        = @('SettingsCatalog', 'EndpointSecurity', 'DeviceConfig', 'AdminTemplates'),
+        [string]   $Label        = 'Tenant'
+    )
+
+    $all = [System.Collections.Generic.List[hashtable]]::new()
+
+    if ('SettingsCatalog' -in $Types) {
+        Write-Host "    [$Label] Settings Catalog..." -ForegroundColor DarkGray
+        $sc = Get-SettingsCatalogPolicies -Token $Token -BaseUrl $BaseUrl -PolicyFilter $PolicyFilter
+        foreach ($item in @($sc)) { if ($null -ne $item) { $all.Add($item) } }
+    }
+    if ('EndpointSecurity' -in $Types) {
+        Write-Host "    [$Label] Endpoint Security (intents)..." -ForegroundColor DarkGray
+        $es = Get-EndpointSecurityPolicies -Token $Token -BaseUrl $BaseUrl -PolicyFilter $PolicyFilter
+        foreach ($item in @($es)) { if ($null -ne $item) { $all.Add($item) } }
+    }
+    if ('DeviceConfig' -in $Types) {
+        Write-Host "    [$Label] Device Configuration..." -ForegroundColor DarkGray
+        $dc = Get-DeviceConfigPolicies -Token $Token -BaseUrl $BaseUrl -PolicyFilter $PolicyFilter
+        foreach ($item in @($dc)) { if ($null -ne $item) { $all.Add($item) } }
+    }
+    if ('AdminTemplates' -in $Types) {
+        Write-Host "    [$Label] Admin Templates..." -ForegroundColor DarkGray
+        $at = Get-AdminTemplatePolicies -Token $Token -BaseUrl $BaseUrl -PolicyFilter $PolicyFilter
+        foreach ($item in @($at)) { if ($null -ne $item) { $all.Add($item) } }
+    }
+
+    return $all
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Step 1 — Baseline settings (all policy types)
+# ─────────────────────────────────────────────────────────────────────────────
+Write-Host '[1/4] Baseline tenant — all policy types' -ForegroundColor Yellow
 
 $baselineCacheFile = Join-Path $BaselinePath 'baseline-cache.json'
 $baselineSettings  = $null
@@ -163,61 +204,130 @@ $baselineSettings  = $null
 if ($UseBaselineCache -and -not $RefreshBaseline -and (Test-Path $baselineCacheFile)) {
     Write-Host "  Loading baseline from cache: $baselineCacheFile" -ForegroundColor DarkGray
 
-    $rawCache    = Get-Content $baselineCacheFile -Raw | ConvertFrom-Json
-
-    # Support both new wrapper format and legacy plain-array format
-    $rawSettings = if ($rawCache.PSObject.Properties['settings']) { $rawCache.settings } else { $rawCache }
-    $cachedHash  = if ($rawCache.PSObject.Properties['meta'])     { $rawCache.meta.domainMappingHash } else { $null }
-
-    $baselineSettings = [System.Collections.Generic.List[hashtable]]::new()
-    foreach ($item in $rawSettings) {
-        $ht = [hashtable]@{}
-        $item.PSObject.Properties | ForEach-Object { $ht[$_.Name] = $_.Value }
-        $baselineSettings.Add($ht)
+    $rawCache  = Get-Content $baselineCacheFile -Raw | ConvertFrom-Json
+    $schemaVer = 1
+    if ($rawCache.PSObject.Properties['meta'] -and
+        $rawCache.meta.PSObject.Properties['schemaVersion']) {
+        $schemaVer = [int]$rawCache.meta.schemaVersion
     }
 
-    # Re-apply enrichment if domain mapping has changed (or cache is old format)
-    $currentHash = (Get-FileHash -Path $domainMappingFile -Algorithm SHA256).Hash
-    if ($cachedHash -ne $currentHash) {
-        Write-Host "  Domain mapping changed — re-applying enrichment to cached settings." -ForegroundColor Yellow
-        Add-DomainEnrichment -Settings $baselineSettings
+    $cacheUsed = $false
+
+    if ($schemaVer -ge 2) {
+        # v2 format — per-type sections; validate coverage
+        $cachedTypes  = @()
+        if ($rawCache.meta.PSObject.Properties['policyTypes']) {
+            $cachedTypes = [string[]]$rawCache.meta.policyTypes
+        }
+        $missingTypes = @($PolicyTypes | Where-Object { $_ -notin $cachedTypes })
+
+        if ($missingTypes.Count -gt 0) {
+            Write-Warning "  Cache is missing policy types: $($missingTypes -join ', '). Re-fetching baseline."
+        }
+        else {
+            $sectionMap = @{
+                SettingsCatalog  = 'settingsCatalog'
+                EndpointSecurity = 'endpointSecurity'
+                DeviceConfig     = 'deviceConfig'
+                AdminTemplates   = 'adminTemplates'
+            }
+            $baselineSettings = [System.Collections.Generic.List[hashtable]]::new()
+            foreach ($type in $PolicyTypes) {
+                $section = $sectionMap[$type]
+                if ($rawCache.PSObject.Properties[$section]) {
+                    foreach ($item in $rawCache.$section) {
+                        $ht = [hashtable]@{}
+                        $item.PSObject.Properties | ForEach-Object { $ht[$_.Name] = $_.Value }
+                        $baselineSettings.Add($ht)
+                    }
+                }
+            }
+            $cacheUsed = $true
+        }
+    }
+    else {
+        # v1 legacy format — Settings Catalog only
+        if ($PolicyTypes.Count -gt 1 -or
+            ($PolicyTypes.Count -eq 1 -and $PolicyTypes[0] -ne 'SettingsCatalog')) {
+            Write-Warning "  Cache is v1 format (Settings Catalog only). Re-fetching with all requested policy types."
+        }
+        else {
+            $rawSettings = if ($rawCache.PSObject.Properties['settings']) { $rawCache.settings } else { $rawCache }
+            $baselineSettings = [System.Collections.Generic.List[hashtable]]::new()
+            foreach ($item in $rawSettings) {
+                $ht = [hashtable]@{}
+                $item.PSObject.Properties | ForEach-Object { $ht[$_.Name] = $_.Value }
+                $baselineSettings.Add($ht)
+            }
+            $cacheUsed = $true
+        }
     }
 
-    Write-Host "  Loaded $($baselineSettings.Count) settings from cache." -ForegroundColor Green
+    if ($cacheUsed) {
+        # Re-apply enrichment if domain mapping has changed
+        $currentHash = (Get-FileHash -Path $domainMappingFile -Algorithm SHA256).Hash
+        $cachedHash  = if ($rawCache.PSObject.Properties['meta'] -and
+                           $rawCache.meta.PSObject.Properties['domainMappingHash']) {
+                           $rawCache.meta.domainMappingHash
+                       } else { $null }
+
+        if ($cachedHash -ne $currentHash) {
+            Write-Host "  Domain mapping changed — re-applying enrichment to cached settings." -ForegroundColor Yellow
+            Add-DomainEnrichment -Settings $baselineSettings
+        }
+
+        Write-Host "  Loaded $($baselineSettings.Count) settings from cache." -ForegroundColor Green
+    }
 }
-else {
+
+if ($null -eq $baselineSettings) {
     if ($UseBaselineCache -and -not (Test-Path $baselineCacheFile)) {
         Write-Warning "  --UseBaselineCache specified but no cache found; fetching from baseline tenant."
     }
 
     $baselineToken    = Connect-BaselineTenant
-    $baselineSettings = Get-SettingsCatalogPolicies -Token $baselineToken -BaseUrl $baseUrl -PolicyFilter $BaselinePolicyFilter
+    $baselineSettings = Get-AllPolicySettings `
+        -Token        $baselineToken `
+        -BaseUrl      $baseUrl `
+        -PolicyFilter $BaselinePolicyFilter `
+        -Types        $PolicyTypes `
+        -Label        'Baseline'
+
     Add-DomainEnrichment -Settings $baselineSettings
 
-    # Save cache (wrapped with metadata for domain-mapping change detection)
+    # Save v2 cache
     if (-not (Test-Path $BaselinePath)) {
         New-Item -ItemType Directory -Path $BaselinePath -Force | Out-Null
     }
     $domainHash   = (Get-FileHash -Path $domainMappingFile -Algorithm SHA256).Hash
     $cachePayload = [ordered]@{
-        meta     = [ordered]@{
+        meta             = [ordered]@{
+            schemaVersion     = 2
             domainMappingHash = $domainHash
             cachedAt          = (Get-Date -Format 'o')
+            policyTypes       = $PolicyTypes
         }
-        settings = $baselineSettings
+        settingsCatalog  = @($baselineSettings | Where-Object { $_.PolicyTemplate -eq 'Settings Catalog' })
+        endpointSecurity = @($baselineSettings | Where-Object { $_.PolicyTemplate -eq 'Endpoint Security' })
+        deviceConfig     = @($baselineSettings | Where-Object { $_.PolicyTemplate -eq 'Device Configuration' })
+        adminTemplates   = @($baselineSettings | Where-Object { $_.PolicyTemplate -eq 'Admin Templates' })
     }
     $cachePayload | ConvertTo-Json -Depth 10 | Set-Content $baselineCacheFile -Encoding UTF8
-    Write-Host "  Baseline cached: $baselineCacheFile" -ForegroundColor DarkGray
+    Write-Host "  Baseline cached ($($baselineSettings.Count) settings): $baselineCacheFile" -ForegroundColor DarkGray
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Step 2 — Customer settings
 # ─────────────────────────────────────────────────────────────────────────────
 Write-Host ''
-Write-Host '[2/4] Customer tenant — Settings Catalog' -ForegroundColor Yellow
+Write-Host '[2/4] Customer tenant — all policy types' -ForegroundColor Yellow
 
 $customerToken    = Connect-CustomerTenant -TenantId $CustomerTenantId
-$customerSettings = Get-SettingsCatalogPolicies -Token $customerToken -BaseUrl $baseUrl
+$customerSettings = Get-AllPolicySettings `
+    -Token  $customerToken `
+    -BaseUrl $baseUrl `
+    -Types   $PolicyTypes `
+    -Label   'Customer'
 Add-DomainEnrichment -Settings $customerSettings
 
 # ─────────────────────────────────────────────────────────────────────────────
