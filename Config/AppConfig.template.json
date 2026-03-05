@@ -1,0 +1,9 @@
+{
+  "_comment": "Copy this file to AppConfig.json and fill in your values. Never commit AppConfig.json to source control.",
+  "ClientId": "00000000-0000-0000-0000-000000000000",
+  "ClientSecret": "<your-client-secret>",
+  "BaselineTenantId": "00000000-0000-0000-0000-000000000000",
+  "Authority": "https://login.microsoftonline.com",
+  "GraphBaseUrl": "https://graph.microsoft.com",
+  "GraphApiVersion": "beta"
+}

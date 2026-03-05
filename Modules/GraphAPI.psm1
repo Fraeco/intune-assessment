@@ -21,6 +21,8 @@ function Invoke-IbaGraphRequest {
         HTTP method (default GET).
     .PARAMETER MaxRetries
         Maximum number of retry attempts for throttling / transient errors.
+    .PARAMETER TimeoutSec
+        Timeout in seconds for each individual HTTP request (default 120).
     .OUTPUTS
         PSCustomObject — The parsed JSON response body.
     #>
@@ -33,7 +35,8 @@ function Invoke-IbaGraphRequest {
         [string]$Token,
 
         [string]$Method     = 'GET',
-        [int]   $MaxRetries = 5
+        [int]   $MaxRetries = 5,
+        [int]   $TimeoutSec = 120
     )
 
     $headers = @{
@@ -51,6 +54,7 @@ function Invoke-IbaGraphRequest {
                 -Uri         $Uri `
                 -Method      $Method `
                 -Headers     $headers `
+                -TimeoutSec  $TimeoutSec `
                 -ErrorAction Stop
             return $response
         }

@@ -41,8 +41,8 @@ function Compare-TenantSettings {
         [System.Collections.Generic.List[hashtable]]$CustomerSettings
     )
 
-    # Index customer settings by DefinitionId for O(1) lookup
-    $customerIndex = [System.Collections.Generic.Dictionary[string, System.Collections.Generic.List[hashtable]]]::new()
+    # Index customer settings by DefinitionId for O(1) lookup (case-insensitive)
+    $customerIndex = [System.Collections.Generic.Dictionary[string, System.Collections.Generic.List[hashtable]]]::new([System.StringComparer]::OrdinalIgnoreCase)
     foreach ($s in $CustomerSettings) {
         $id = $s.DefinitionId
         if (-not $customerIndex.ContainsKey($id)) {
@@ -75,7 +75,7 @@ function Compare-TenantSettings {
     # ── Extra settings (customer-only) ───────────────────────────────────────
     # Deduplicate: if the same DefinitionId appears in multiple customer policies
     # it should produce only ONE Extra row (all policies comma-separated).
-    $extraIndex = [System.Collections.Generic.Dictionary[string, System.Collections.Generic.List[hashtable]]]::new()
+    $extraIndex = [System.Collections.Generic.Dictionary[string, System.Collections.Generic.List[hashtable]]]::new([System.StringComparer]::OrdinalIgnoreCase)
     foreach ($s in $CustomerSettings) {
         if (-not $baselineIds.Contains($s.DefinitionId)) {
             if (-not $extraIndex.ContainsKey($s.DefinitionId)) {

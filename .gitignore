@@ -3,7 +3,7 @@
 Config/AppConfig.json
 
 # ── Generated output ────────────────────────────────────────────────────────
-Exports/
+exports/
 Baseline/baseline-cache.json
 
 # ── OS / editor artefacts ───────────────────────────────────────────────────

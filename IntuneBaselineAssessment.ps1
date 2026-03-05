@@ -137,7 +137,7 @@ if (-not (Test-Path $configFile)) {
 Configuration file not found: $configFile
 
 Copy the template and fill in your values:
-  cp Config\AppConfig.json Config\AppConfig.json
+  cp Config\AppConfig.template.json Config\AppConfig.json
 Then edit AppConfig.json with your ClientId, ClientSecret, and BaselineTenantId.
 "@
 }
@@ -398,14 +398,7 @@ if ($domainGroups.Count -gt 0) {
         $dc  = @($d.Group | Where-Object { $_.Result -eq 'Compliant' }).Count
         $dt  = $d.Group.Count
         $pct = if ($dt -gt 0) { [Math]::Round($dc / $dt * 100) } else { 0 }
-        $score = switch ($pct) {
-            { $_ -eq 0 }  { 0; break }
-            { $_ -lt 25 } { 1; break }
-            { $_ -lt 50 } { 2; break }
-            { $_ -lt 75 } { 3; break }
-            { $_ -lt 90 } { 4; break }
-            default        { 5 }
-        }
+        $score = Get-MaturityScore -CompliantPct $pct
         $scoreColor = switch ($score) {
             0 { 'DarkRed'    }
             1 { 'Red'        }

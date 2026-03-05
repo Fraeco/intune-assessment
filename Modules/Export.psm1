@@ -140,14 +140,7 @@ function Export-ReportData {
         $dc = @($g.Group | Where-Object { $_.Result -eq 'Compliant' }).Count
         $dt = $g.Group.Count
         $pct = if ($dt -gt 0) { [Math]::Round($dc / $dt * 100) } else { 0 }
-        $score = switch ($pct) {
-            { $_ -eq 0 }  { 0; break }
-            { $_ -lt 25 } { 1; break }
-            { $_ -lt 50 } { 2; break }
-            { $_ -lt 75 } { 3; break }
-            { $_ -lt 90 } { 4; break }
-            default       { 5 }
-        }
+        $score = Get-MaturityScore -CompliantPct $pct
         $byDomain[$g.Name] = [ordered]@{
             Compliant    = $dc
             Conflict     = @($g.Group | Where-Object { $_.Result -eq 'Conflict' }).Count
@@ -184,7 +177,34 @@ function Export-ReportData {
     return $filePath
 }
 
+function Get-MaturityScore {
+    <#
+    .SYNOPSIS
+        Converts a compliance percentage (0-100) to a maturity score (0-5).
+    .PARAMETER CompliantPct
+        Integer percentage of compliant settings (0-100).
+    .OUTPUTS
+        Int — maturity score from 0 (no compliance) to 5 (>=90%).
+    #>
+    [CmdletBinding()]
+    [OutputType([int])]
+    param(
+        [Parameter(Mandatory)]
+        [int]$CompliantPct
+    )
+
+    switch ($CompliantPct) {
+        { $_ -eq 0 }  { return 0 }
+        { $_ -lt 25 } { return 1 }
+        { $_ -lt 50 } { return 2 }
+        { $_ -lt 75 } { return 3 }
+        { $_ -lt 90 } { return 4 }
+        default        { return 5 }
+    }
+}
+
 Export-ModuleMember -Function @(
     'Export-DiffCsv',
-    'Export-ReportData'
+    'Export-ReportData',
+    'Get-MaturityScore'
 )
