@@ -5,9 +5,8 @@
     the eVri hardened baseline and exports a diff CSV for the assessment report.
 
 .DESCRIPTION
-    Sprint 2 scope: Settings Catalog, Endpoint Security (intents), Device
-    Configuration, and Admin Templates policies.
-    Future sprints: Security Baselines, Compliance Policies.
+    Sprint 4 scope: Settings Catalog, Endpoint Security (intents), Device
+    Configuration, Admin Templates, Compliance Policies, and Security Baselines.
 
 .PARAMETER CustomerTenantId
     Azure AD Tenant ID (GUID) of the customer tenant to assess.
@@ -92,8 +91,8 @@ param(
     [switch]$RefreshBaseline,
     [switch]$GenerateReportData,
 
-    [ValidateSet('SettingsCatalog', 'EndpointSecurity', 'DeviceConfig', 'AdminTemplates')]
-    [string[]]$PolicyTypes = @('SettingsCatalog', 'EndpointSecurity', 'DeviceConfig', 'AdminTemplates')
+    [ValidateSet('SettingsCatalog', 'EndpointSecurity', 'DeviceConfig', 'AdminTemplates', 'CompliancePolicy', 'SecurityBaseline')]
+    [string[]]$PolicyTypes = @('SettingsCatalog', 'EndpointSecurity', 'DeviceConfig', 'AdminTemplates', 'CompliancePolicy', 'SecurityBaseline')
 )
 
 Set-StrictMode -Version Latest
@@ -104,8 +103,8 @@ $ErrorActionPreference = 'Stop'
 # ─────────────────────────────────────────────────────────────────────────────
 Write-Host ''
 Write-Host '╔══════════════════════════════════════════════════════╗' -ForegroundColor Cyan
-Write-Host '║    Intune Baseline Assessment Tool  v0.2.0           ║' -ForegroundColor Cyan
-Write-Host '║    Sprint 2 — +ES / DevConfig / AdminTemplates       ║' -ForegroundColor Cyan
+Write-Host '║    Intune Baseline Assessment Tool  v0.4.0           ║' -ForegroundColor Cyan
+Write-Host '║    Sprint 4 — +Compliance / Security Baselines       ║' -ForegroundColor Cyan
 Write-Host '╚══════════════════════════════════════════════════════╝' -ForegroundColor Cyan
 Write-Host "  Customer      : $CustomerName" -ForegroundColor White
 Write-Host "  Tenant ID     : $CustomerTenantId" -ForegroundColor White
@@ -120,7 +119,7 @@ Write-Host ''
 # ─────────────────────────────────────────────────────────────────────────────
 $moduleRoot = Join-Path $PSScriptRoot 'Modules'
 
-foreach ($moduleName in @('Auth', 'GraphAPI', 'PolicyReader', 'EndpointSecurityReader', 'DeviceConfigReader', 'AdminTemplateReader', 'Comparison', 'Enrichment', 'Export')) {
+foreach ($moduleName in @('Auth', 'GraphAPI', 'PolicyReader', 'EndpointSecurityReader', 'DeviceConfigReader', 'AdminTemplateReader', 'CompliancePolicyReader', 'SecurityBaselineReader', 'Comparison', 'Enrichment', 'Export')) {
     $modulePath = Join-Path $moduleRoot "$moduleName.psm1"
     if (-not (Test-Path $modulePath)) {
         throw "Required module not found: $modulePath"
@@ -189,6 +188,16 @@ function Get-AllPolicySettings {
         $at = Get-AdminTemplatePolicies -Token $Token -BaseUrl $BaseUrl -PolicyFilter $PolicyFilter
         foreach ($item in @($at)) { if ($null -ne $item) { $all.Add($item) } }
     }
+    if ('CompliancePolicy' -in $Types) {
+        Write-Host "    [$Label] Compliance Policies..." -ForegroundColor DarkGray
+        $cp = Get-CompliancePolicies -Token $Token -BaseUrl $BaseUrl -PolicyFilter $PolicyFilter
+        foreach ($item in @($cp)) { if ($null -ne $item) { $all.Add($item) } }
+    }
+    if ('SecurityBaseline' -in $Types) {
+        Write-Host "    [$Label] Security Baselines..." -ForegroundColor DarkGray
+        $sb = Get-SecurityBaselinePolicies -Token $Token -BaseUrl $BaseUrl -PolicyFilter $PolicyFilter
+        foreach ($item in @($sb)) { if ($null -ne $item) { $all.Add($item) } }
+    }
 
     return $all
 }
@@ -230,6 +239,8 @@ if ($UseBaselineCache -and -not $RefreshBaseline -and (Test-Path $baselineCacheF
                 EndpointSecurity = 'endpointSecurity'
                 DeviceConfig     = 'deviceConfig'
                 AdminTemplates   = 'adminTemplates'
+                CompliancePolicy = 'compliancePolicies'
+                SecurityBaseline = 'securityBaselines'
             }
             $baselineSettings = [System.Collections.Generic.List[hashtable]]::new()
             foreach ($type in $PolicyTypes) {
@@ -307,10 +318,12 @@ if ($null -eq $baselineSettings) {
             cachedAt          = (Get-Date -Format 'o')
             policyTypes       = $PolicyTypes
         }
-        settingsCatalog  = @($baselineSettings | Where-Object { $_.PolicyTemplate -eq 'Settings Catalog' })
-        endpointSecurity = @($baselineSettings | Where-Object { $_.PolicyTemplate -eq 'Endpoint Security' })
-        deviceConfig     = @($baselineSettings | Where-Object { $_.PolicyTemplate -eq 'Device Configuration' })
-        adminTemplates   = @($baselineSettings | Where-Object { $_.PolicyTemplate -eq 'Admin Templates' })
+        settingsCatalog    = @($baselineSettings | Where-Object { $_.PolicyTemplate -eq 'Settings Catalog' })
+        endpointSecurity   = @($baselineSettings | Where-Object { $_.PolicyTemplate -eq 'Endpoint Security' })
+        deviceConfig       = @($baselineSettings | Where-Object { $_.PolicyTemplate -eq 'Device Configuration' })
+        adminTemplates     = @($baselineSettings | Where-Object { $_.PolicyTemplate -eq 'Admin Templates' })
+        compliancePolicies = @($baselineSettings | Where-Object { $_.PolicyTemplate -eq 'Compliance Policy' })
+        securityBaselines  = @($baselineSettings | Where-Object { $_.PolicyTemplate -eq 'Security Baseline' })
     }
     $cachePayload | ConvertTo-Json -Depth 10 | Set-Content $baselineCacheFile -Encoding UTF8
     Write-Host "  Baseline cached ($($baselineSettings.Count) settings): $baselineCacheFile" -ForegroundColor DarkGray

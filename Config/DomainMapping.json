@@ -83,6 +83,13 @@
 
     "_comment_3": "--- Compliance & Governance ---",
     "dc:windows10CompliancePolicy": "Compliance & Governance",
+    "cp:windows10CompliancePolicy": "Compliance & Governance",
+    "cp:windows10MobileCompliancePolicy": "Compliance & Governance",
+    "cp:macOSCompliancePolicy": "Compliance & Governance",
+    "cp:androidCompliancePolicy": "Compliance & Governance",
+    "cp:iosCompliancePolicy": "Compliance & Governance",
+    "cp:androidDeviceOwnerCompliancePolicy": "Compliance & Governance",
+    "cp:androidWorkProfileCompliancePolicy": "Compliance & Governance",
 
     "_comment_4": "--- Operations & Monitoring (WUfB, telemetry, delivery optimization, audit/event logging) ---",
     "dc:windowsUpdateForBusinessConfiguration": "Operations & Monitoring",
@@ -230,6 +237,9 @@
 
     "SBZ-Win-L1-CP-": "Compliance & Governance",
     "SBZ-Win-L2-CP-": "Compliance & Governance",
+
+    "SBZ-Win-L1-SB-": "Endpoint Security",
+    "SBZ-Win-L2-SB-": "Endpoint Security",
 
     "SBZ-Win-Custom-AL-": "Application Lifecycle",
     "SBZ-Win-L1-AL-": "Application Lifecycle",
