@@ -1,8 +1,7 @@
 # =============================================================================
 # Export.psm1 — Output generation
 #
-# Sprint 1: CSV export matching the IntuneDiff_Export.csv schema.
-# Later sprints: ReportData.json for Word document population.
+# CSV export (IntuneDiff_Export schema) + inventory CSVs + ReportData.json.
 #
 # CSV format: semicolon-delimited, all fields double-quoted, UTF-8 with BOM.
 # =============================================================================
@@ -91,6 +90,136 @@ function Export-DiffCsv {
     return $filePath
 }
 
+# ---------------------------------------------------------------------------
+# Internal — shared CSV writer
+# ---------------------------------------------------------------------------
+
+function Write-SemicolonCsv {
+    <#
+    .SYNOPSIS
+        Writes a semicolon-delimited, double-quoted, UTF-8 BOM CSV file.
+    #>
+    param(
+        [string]$FilePath,
+        [string]$Header,
+        [string[]]$ColumnKeys,
+        $Rows
+    )
+
+    $lines = [System.Collections.Generic.List[string]]::new()
+    $lines.Add($Header)
+
+    foreach ($row in $Rows) {
+        $fields = $ColumnKeys | ForEach-Object {
+            $raw = if ($row.ContainsKey($_) -and $null -ne $row[$_]) { "$($row[$_])" } else { '' }
+            $escaped = $raw -replace '"', '""'
+            "`"$escaped`""
+        }
+        $lines.Add($fields -join ';')
+    }
+
+    $encoding = [System.Text.UTF8Encoding]::new($true)
+    [System.IO.File]::WriteAllLines($FilePath, $lines, $encoding)
+}
+
+# ---------------------------------------------------------------------------
+# Internal — shared filename builder
+# ---------------------------------------------------------------------------
+
+function Get-ExportFileName {
+    param([string]$CustomerName, [string]$BaselineLevel, [string]$Suffix)
+    $timestamp = Get-Date -Format 'yyyyMMdd'
+    $safeName  = $CustomerName -replace '[^\w\-]', '_'
+    return "${safeName}_${timestamp}_${BaselineLevel}_${Suffix}.csv"
+}
+
+# ---------------------------------------------------------------------------
+# Public — Inventory CSV exporters
+# ---------------------------------------------------------------------------
+
+function Export-DeviceInventoryCsv {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory)] [System.Collections.Generic.List[hashtable]]$Devices,
+        [Parameter(Mandatory)] [string]$OutputPath,
+        [string]$CustomerName  = 'Customer',
+        [string]$BaselineLevel = 'L1'
+    )
+
+    if (-not (Test-Path $OutputPath)) {
+        New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
+    }
+
+    $header = '"Device Name";"Device ID";"Operating System";"OS Version";"Compliance State";"Last Sync";"Enrolled Date";"Management Agent";"Enrollment Type";"Model";"Manufacturer";"Serial Number";"User Principal Name"'
+    $columns = @('DeviceName','DeviceId','OperatingSystem','OsVersion','ComplianceState','LastSync','EnrolledDate','ManagementAgent','EnrollmentType','Model','Manufacturer','SerialNumber','UserPrincipalName')
+
+    $fileName = Get-ExportFileName -CustomerName $CustomerName -BaselineLevel $BaselineLevel -Suffix 'DeviceInventory'
+    $filePath = Join-Path $OutputPath $fileName
+
+    Write-SemicolonCsv -FilePath $filePath -Header $header -ColumnKeys $columns -Rows $Devices
+    return $filePath
+}
+
+function Export-EnrollmentCsv {
+    [CmdletBinding()]
+    [OutputType([hashtable])]
+    param(
+        [Parameter(Mandatory)] [hashtable]$EnrollmentData,
+        [Parameter(Mandatory)] [string]$OutputPath,
+        [string]$CustomerName  = 'Customer',
+        [string]$BaselineLevel = 'L1'
+    )
+
+    if (-not (Test-Path $OutputPath)) {
+        New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
+    }
+
+    # Enrollment Configs CSV
+    $configHeader  = '"Config Name";"Config ID";"Config Type";"Priority";"Description";"Created Date";"Last Modified"'
+    $configColumns = @('ConfigName','ConfigId','ConfigType','Priority','Description','CreatedDate','LastModified')
+    $configFile    = Get-ExportFileName -CustomerName $CustomerName -BaselineLevel $BaselineLevel -Suffix 'EnrollmentConfigs'
+    $configPath    = Join-Path $OutputPath $configFile
+    Write-SemicolonCsv -FilePath $configPath -Header $configHeader -ColumnKeys $configColumns -Rows $EnrollmentData.EnrollmentConfigs
+
+    # Autopilot Devices CSV
+    $apHeader  = '"Serial Number";"Model";"Manufacturer";"Group Tag";"Purchase Order";"Enrollment State";"Last Contacted";"Profile Assignment Status"'
+    $apColumns = @('SerialNumber','Model','Manufacturer','GroupTag','PurchaseOrderId','EnrollmentState','LastContactedDateTime','DeploymentProfileAssignmentStatus')
+    $apFile    = Get-ExportFileName -CustomerName $CustomerName -BaselineLevel $BaselineLevel -Suffix 'AutopilotDevices'
+    $apPath    = Join-Path $OutputPath $apFile
+    Write-SemicolonCsv -FilePath $apPath -Header $apHeader -ColumnKeys $apColumns -Rows $EnrollmentData.AutopilotDevices
+
+    return @{ ConfigsCsv = $configPath; AutopilotCsv = $apPath }
+}
+
+function Export-AppInventoryCsv {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory)] [System.Collections.Generic.List[hashtable]]$Apps,
+        [Parameter(Mandatory)] [string]$OutputPath,
+        [string]$CustomerName  = 'Customer',
+        [string]$BaselineLevel = 'L1'
+    )
+
+    if (-not (Test-Path $OutputPath)) {
+        New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
+    }
+
+    $header  = '"App Name";"App ID";"App Type";"Publisher";"Created Date";"Last Modified";"Is Assigned";"Assignment Count";"Assignment Intent";"Assignment Groups"'
+    $columns = @('AppName','AppId','AppType','Publisher','CreatedDate','LastModified','IsAssigned','AssignmentCount','AssignmentIntent','AssignmentGroups')
+
+    $fileName = Get-ExportFileName -CustomerName $CustomerName -BaselineLevel $BaselineLevel -Suffix 'AppInventory'
+    $filePath = Join-Path $OutputPath $fileName
+
+    Write-SemicolonCsv -FilePath $filePath -Header $header -ColumnKeys $columns -Rows $Apps
+    return $filePath
+}
+
+# ---------------------------------------------------------------------------
+# Public — ReportData.json
+# ---------------------------------------------------------------------------
+
 function Export-ReportData {
     <#
     .SYNOPSIS
@@ -117,7 +246,11 @@ function Export-ReportData {
 
         [string]$CustomerName  = 'Customer',
         [string]$Consultant    = '',
-        [string]$BaselineLevel = 'L1'
+        [string]$BaselineLevel = 'L1',
+
+        [System.Collections.Generic.List[hashtable]]$DeviceInventory = $null,
+        [hashtable]$EnrollmentData = $null,
+        [System.Collections.Generic.List[hashtable]]$AppInventory = $null
     )
 
     if (-not (Test-Path $OutputPath)) {
@@ -166,6 +299,45 @@ function Export-ReportData {
         ByDomain       = $byDomain
     }
 
+    # Inventory sections (optional — only present when data was collected)
+    if ($null -ne $DeviceInventory) {
+        $osSummary = @($DeviceInventory | Group-Object OperatingSystem |
+            ForEach-Object { [ordered]@{ OS = $_.Name; Count = $_.Count } })
+        $complianceSummary = @($DeviceInventory | Group-Object ComplianceState |
+            ForEach-Object { [ordered]@{ State = $_.Name; Count = $_.Count } })
+
+        $reportData['DeviceInventory'] = [ordered]@{
+            TotalDevices      = $DeviceInventory.Count
+            ByOperatingSystem = $osSummary
+            ByComplianceState = $complianceSummary
+            Devices           = @($DeviceInventory)
+        }
+    }
+
+    if ($null -ne $EnrollmentData) {
+        $reportData['EnrollmentMethods'] = [ordered]@{
+            EnrollmentConfigCount = $EnrollmentData.EnrollmentConfigs.Count
+            AutopilotDeviceCount  = $EnrollmentData.AutopilotDevices.Count
+            EnrollmentConfigs     = @($EnrollmentData.EnrollmentConfigs)
+            AutopilotDevices      = @($EnrollmentData.AutopilotDevices)
+        }
+    }
+
+    if ($null -ne $AppInventory) {
+        $typeSummary     = @($AppInventory | Group-Object AppType |
+            ForEach-Object { [ordered]@{ Type = $_.Name; Count = $_.Count } })
+        $assignedCount   = @($AppInventory | Where-Object { $_.IsAssigned -eq 'Yes' }).Count
+        $unassignedCount = @($AppInventory | Where-Object { $_.IsAssigned -eq 'No'  }).Count
+
+        $reportData['AppInventory'] = [ordered]@{
+            TotalApps      = $AppInventory.Count
+            AssignedApps   = $assignedCount
+            UnassignedApps = $unassignedCount
+            ByAppType      = $typeSummary
+            Apps           = @($AppInventory)
+        }
+    }
+
     $timestamp = Get-Date -Format 'yyyyMMdd'
     $safeName  = $CustomerName -replace '[^\w\-]', '_'
     $fileName  = "${safeName}_${timestamp}_${BaselineLevel}_ReportData.json"
@@ -205,6 +377,9 @@ function Get-MaturityScore {
 
 Export-ModuleMember -Function @(
     'Export-DiffCsv',
+    'Export-DeviceInventoryCsv',
+    'Export-EnrollmentCsv',
+    'Export-AppInventoryCsv',
     'Export-ReportData',
     'Get-MaturityScore'
 )

@@ -3,22 +3,26 @@
 Compares a customer Microsoft Intune tenant against a hardened baseline tenant and
 exports a diff CSV for assessment reporting. Supports Settings Catalog, Endpoint
 Security (intents), Device Configuration, Admin Templates, Compliance Policies,
-and Security Baselines. Optional JSON output aggregates results for report
+and Security Baselines. Also collects device, enrollment, and application inventory
+for the customer tenant. Optional JSON output aggregates all results for report
 population.
 
 ## Key capabilities
 
 - Baseline vs customer comparison with Compliant / Conflict / Missing / Extra results
-- Baseline caching for faster reruns
-- Domain enrichment across 5 assessment domains via Config/DomainMapping.json
-- CSV output formatted for Excel (semicolon-delimited, UTF-8 with BOM)
-- Optional ReportData.json for summary rollups
+- 6 policy types: Settings Catalog, Endpoint Security, Device Configuration, Admin Templates, Compliance Policies, Security Baselines
+- Device inventory — managed devices with compliance state and OS version
+- Enrollment analysis — enrollment configurations and Autopilot device identities
+- Application inventory — mobile apps with assignment intent and group targeting
+- Domain enrichment across 5 assessment domains via `Config/DomainMapping.json`
+- Baseline caching (v2) for faster reruns; hash-based soft re-enrichment on domain mapping changes
+- CSV outputs formatted for Excel (semicolon-delimited, UTF-8 with BOM)
+- Optional `ReportData.json` for summary rollups including inventory sections
 
 ## Prerequisites
 
-- Windows PowerShell 5.1
-- An Azure AD app with Microsoft Graph **application** permissions to read Intune
-  configuration in both the baseline and customer tenants
+- Windows PowerShell 5.1+
+- A multi-tenant Azure AD app registration with Microsoft Graph **application** permissions (see [App Registration](#app-registration))
 - Access to the baseline tenant ID used for comparison
 
 ## Setup
@@ -36,11 +40,23 @@ population.
    - `Authority` (default: `https://login.microsoftonline.com`)
    - `GraphBaseUrl` and `GraphApiVersion` (default: `beta`)
 
-`AppConfig.json` should remain uncommitted.
+`AppConfig.json` is git-ignored and should never be committed.
+
+## App Registration
+
+Create a multi-tenant Azure AD app registration with the following **application** permissions (no user sign-in required). Customer admins must grant admin consent.
+
+| Permission | Purpose |
+|---|---|
+| `DeviceManagementConfiguration.Read.All` | Settings Catalog, Device Config, Admin Templates, Compliance Policies, Security Baselines |
+| `DeviceManagementManagedDevices.Read.All` | Device inventory |
+| `DeviceManagementServiceConfig.Read.All` | Enrollment configurations, Autopilot devices |
+| `DeviceManagementApps.Read.All` | Application inventory and assignments |
+| `Group.Read.All` | *(Optional)* Resolve assignment group GUIDs to display names |
 
 ## Usage
 
-Basic run:
+Full run (all 6 policy types + inventory):
 
 ```powershell
 .\IntuneBaselineAssessment.ps1 `
@@ -48,47 +64,104 @@ Basic run:
   -CustomerName "Contoso"
 ```
 
-Filter baseline policies and reuse cache:
+With cached baseline and report data:
+
+```powershell
+.\IntuneBaselineAssessment.ps1 `
+  -CustomerTenantId "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" `
+  -CustomerName "Contoso" `
+  -UseBaselineCache `
+  -GenerateReportData
+```
+
+Skip inventory collection (faster for iterative testing):
+
+```powershell
+.\IntuneBaselineAssessment.ps1 `
+  -CustomerTenantId "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" `
+  -CustomerName "Contoso" `
+  -SkipInventory
+```
+
+Specific policy types only:
+
+```powershell
+.\IntuneBaselineAssessment.ps1 `
+  -CustomerTenantId "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" `
+  -CustomerName "Contoso" `
+  -PolicyTypes SettingsCatalog, CompliancePolicy
+```
+
+Filter baseline policies and force cache refresh:
 
 ```powershell
 .\IntuneBaselineAssessment.ps1 `
   -CustomerTenantId "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" `
   -CustomerName "Contoso" `
   -BaselinePolicyFilter 'SBZ-Win-L1-*','SBZ-Win-Custom-*' `
-  -UseBaselineCache `
-  -GenerateReportData
+  -RefreshBaseline
 ```
+
+## Parameters
+
+| Parameter | Type | Description |
+|---|---|---|
+| `CustomerTenantId` | string (required) | Customer Azure AD tenant ID (GUID) |
+| `CustomerName` | string (required) | Used in output filenames |
+| `BaselineLevel` | L1/L2/L3/L4 | Baseline tier label (default: L1) |
+| `BaselinePolicyFilter` | string[] | Wildcard patterns for baseline policy names |
+| `UseBaselineCache` | switch | Use `Baseline\baseline-cache.json` instead of refetching |
+| `RefreshBaseline` | switch | Force baseline re-fetch and overwrite cache |
+| `GenerateReportData` | switch | Write `ReportData.json` with aggregated scores and inventory |
+| `SkipInventory` | switch | Skip device/enrollment/app inventory collection |
+| `PolicyTypes` | string[] | Subset of policy types to compare (default: all 6) |
+
+`PolicyTypes` values: `SettingsCatalog`, `EndpointSecurity`, `DeviceConfig`, `AdminTemplates`, `CompliancePolicy`, `SecurityBaseline`
 
 ## Outputs
 
-Files are written to `Exports\` by default:
+All files are written to `Exports\` by default:
 
-- `{Customer}_{yyyyMMdd}_{Lx}_IntuneDiff_Export.csv`
-- `{Customer}_{yyyyMMdd}_{Lx}_ReportData.json` (when `-GenerateReportData`)
+| File | When |
+|---|---|
+| `{Customer}_{date}_{Lx}_IntuneDiff_Export.csv` | Always |
+| `{Customer}_{date}_{Lx}_DeviceInventory.csv` | When inventory collected |
+| `{Customer}_{date}_{Lx}_EnrollmentConfigs.csv` | When inventory collected |
+| `{Customer}_{date}_{Lx}_AutopilotDevices.csv` | When inventory collected |
+| `{Customer}_{date}_{Lx}_AppInventory.csv` | When inventory collected |
+| `{Customer}_{date}_{Lx}_ReportData.json` | With `-GenerateReportData` |
 
-Baseline cache is stored in `Baseline\baseline-cache.json`.
-
-## Parameters (high level)
-
-- `CustomerTenantId` (required): customer Azure AD tenant ID (GUID)
-- `CustomerName` (required): used in output filenames
-- `BaselineLevel`: L1/L2/L3/L4 label used in outputs
-- `BaselinePolicyFilter`: wildcard patterns for baseline policy names
-- `UseBaselineCache`: use cached baseline instead of refetching
-- `RefreshBaseline`: force refresh baseline cache
-- `GenerateReportData`: write summary JSON
-- `PolicyTypes`: subset of policy types to read
+Baseline cache: `Baseline\baseline-cache.json`
 
 ## Repository layout
 
-- `IntuneBaselineAssessment.ps1` — entry point
-- `Modules\` — policy readers, comparison engine, export, auth, Graph helpers
-- `Config\` — app config template and domain mapping
-- `Baseline\` — baseline cache (generated)
-- `Exports\` — CSV/JSON outputs (generated)
+```
+IntuneBaselineAssessment.ps1   — entry point (orchestrator)
+Modules\
+  Auth.psm1                    — OAuth2 client credentials, token caching
+  GraphAPI.psm1                — Graph HTTP helpers, pagination, retry/throttle
+  PolicyReader.psm1            — Settings Catalog reader
+  EndpointSecurityReader.psm1  — Endpoint Security intents reader
+  DeviceConfigReader.psm1      — Device Configuration profiles reader
+  AdminTemplateReader.psm1     — Admin Templates (ADMX/GP) reader
+  CompliancePolicyReader.psm1  — Compliance Policy reader
+  SecurityBaselineReader.psm1  — Security Baselines reader
+  DeviceInventoryReader.psm1   — Managed device inventory
+  EnrollmentAnalyzer.psm1      — Enrollment configs + Autopilot devices
+  AppInventoryReader.psm1      — App inventory with assignment data
+  Comparison.psm1              — Diff engine (Compliant/Conflict/Missing/Extra)
+  Enrichment.psm1              — Domain enrichment via DomainMapping.json
+  Export.psm1                  — CSV and JSON output generation
+Config\
+  AppConfig.template.json      — Config template (copy to AppConfig.json)
+  DomainMapping.json           — Domain enrichment rules
+Baseline\                      — Baseline cache (generated, not committed)
+Exports\                       — Output files (generated, not committed)
+```
 
 ## Notes
 
-- Uses Microsoft Graph (default `beta`) and client credentials flow.
-- Domain mapping in `Config\DomainMapping.json` drives report categorization.
-- Baseline policy filters are baked into the cache; refresh if filters change.
+- Uses Microsoft Graph API (`beta` endpoint) with the OAuth2 client credentials flow.
+- Domain mapping in `Config\DomainMapping.json` drives report categorization across 5 assessment domains: Endpoint Security, Device Management, Compliance & Governance, Application Lifecycle, Operations & Monitoring.
+- Baseline policy filters are baked into the cache; use `-RefreshBaseline` if filters change.
+- New Graph API permissions (`DeviceManagementServiceConfig.Read.All`, `DeviceManagementApps.Read.All`) must be granted by the customer admin before inventory collection will succeed. Missing permissions produce a warning and an empty inventory, not a fatal error.

@@ -5,8 +5,9 @@
     the eVri hardened baseline and exports a diff CSV for the assessment report.
 
 .DESCRIPTION
-    Sprint 4 scope: Settings Catalog, Endpoint Security (intents), Device
-    Configuration, Admin Templates, Compliance Policies, and Security Baselines.
+    Sprint 5 scope: Settings Catalog, Endpoint Security (intents), Device
+    Configuration, Admin Templates, Compliance Policies, Security Baselines,
+    plus device/enrollment/application inventory.
 
 .PARAMETER CustomerTenantId
     Azure AD Tenant ID (GUID) of the customer tenant to assess.
@@ -90,6 +91,7 @@ param(
     [switch]$UseBaselineCache,
     [switch]$RefreshBaseline,
     [switch]$GenerateReportData,
+    [switch]$SkipInventory,
 
     [ValidateSet('SettingsCatalog', 'EndpointSecurity', 'DeviceConfig', 'AdminTemplates', 'CompliancePolicy', 'SecurityBaseline')]
     [string[]]$PolicyTypes = @('SettingsCatalog', 'EndpointSecurity', 'DeviceConfig', 'AdminTemplates', 'CompliancePolicy', 'SecurityBaseline')
@@ -103,8 +105,8 @@ $ErrorActionPreference = 'Stop'
 # ─────────────────────────────────────────────────────────────────────────────
 Write-Host ''
 Write-Host '╔══════════════════════════════════════════════════════╗' -ForegroundColor Cyan
-Write-Host '║    Intune Baseline Assessment Tool  v0.4.0           ║' -ForegroundColor Cyan
-Write-Host '║    Sprint 4 — +Compliance / Security Baselines       ║' -ForegroundColor Cyan
+Write-Host '║    Intune Baseline Assessment Tool  v0.5.0           ║' -ForegroundColor Cyan
+Write-Host '║    Sprint 5 — +Inventory                             ║' -ForegroundColor Cyan
 Write-Host '╚══════════════════════════════════════════════════════╝' -ForegroundColor Cyan
 Write-Host "  Customer      : $CustomerName" -ForegroundColor White
 Write-Host "  Tenant ID     : $CustomerTenantId" -ForegroundColor White
@@ -119,7 +121,7 @@ Write-Host ''
 # ─────────────────────────────────────────────────────────────────────────────
 $moduleRoot = Join-Path $PSScriptRoot 'Modules'
 
-foreach ($moduleName in @('Auth', 'GraphAPI', 'PolicyReader', 'EndpointSecurityReader', 'DeviceConfigReader', 'AdminTemplateReader', 'CompliancePolicyReader', 'SecurityBaselineReader', 'Comparison', 'Enrichment', 'Export')) {
+foreach ($moduleName in @('Auth', 'GraphAPI', 'PolicyReader', 'EndpointSecurityReader', 'DeviceConfigReader', 'AdminTemplateReader', 'CompliancePolicyReader', 'SecurityBaselineReader', 'DeviceInventoryReader', 'EnrollmentAnalyzer', 'AppInventoryReader', 'Comparison', 'Enrichment', 'Export')) {
     $modulePath = Join-Path $moduleRoot "$moduleName.psm1"
     if (-not (Test-Path $modulePath)) {
         throw "Required module not found: $modulePath"
@@ -205,7 +207,7 @@ function Get-AllPolicySettings {
 # ─────────────────────────────────────────────────────────────────────────────
 # Step 1 — Baseline settings (all policy types)
 # ─────────────────────────────────────────────────────────────────────────────
-Write-Host '[1/4] Baseline tenant — all policy types' -ForegroundColor Yellow
+Write-Host '[1/5] Baseline tenant — all policy types' -ForegroundColor Yellow
 
 $baselineCacheFile = Join-Path $BaselinePath 'baseline-cache.json'
 $baselineSettings  = $null
@@ -333,7 +335,7 @@ if ($null -eq $baselineSettings) {
 # Step 2 — Customer settings
 # ─────────────────────────────────────────────────────────────────────────────
 Write-Host ''
-Write-Host '[2/4] Customer tenant — all policy types' -ForegroundColor Yellow
+Write-Host '[2/5] Customer tenant — policy settings' -ForegroundColor Yellow
 
 $customerToken    = Connect-CustomerTenant -TenantId $CustomerTenantId
 $customerSettings = Get-AllPolicySettings `
@@ -344,20 +346,47 @@ $customerSettings = Get-AllPolicySettings `
 Add-DomainEnrichment -Settings $customerSettings
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Step 3 — Compare
+# Step 3 — Customer tenant inventory (devices, enrollment, apps)
+# ─────────────────────────────────────────────────────────────────────────────
+$deviceInventory  = $null
+$enrollmentData   = $null
+$appInventory     = $null
+
+if (-not $SkipInventory) {
+    Write-Host ''
+    Write-Host '[3/5] Customer tenant — inventory collection' -ForegroundColor Yellow
+
+    $deviceInventory = Get-DeviceInventory -Token $customerToken -BaseUrl $baseUrl
+    $enrollmentData  = Get-EnrollmentAnalysis -Token $customerToken -BaseUrl $baseUrl
+    $appInventory    = Get-AppInventory -Token $customerToken -BaseUrl $baseUrl
+
+    $invDevices = if ($null -ne $deviceInventory) { $deviceInventory.Count } else { 0 }
+    $invConfigs = if ($null -ne $enrollmentData -and $null -ne $enrollmentData.EnrollmentConfigs) { $enrollmentData.EnrollmentConfigs.Count } else { 0 }
+    $invAp      = if ($null -ne $enrollmentData -and $null -ne $enrollmentData.AutopilotDevices) { $enrollmentData.AutopilotDevices.Count } else { 0 }
+    $invApps    = if ($null -ne $appInventory) { $appInventory.Count } else { 0 }
+
+    Write-Host "    Collected: $invDevices devices, $invConfigs enrollment configs, $invAp Autopilot devices, $invApps apps." -ForegroundColor Green
+}
+else {
+    Write-Host ''
+    Write-Host '[3/5] Customer tenant — inventory collection (skipped)' -ForegroundColor DarkGray
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Step 4 — Compare
 # ─────────────────────────────────────────────────────────────────────────────
 Write-Host ''
-Write-Host '[3/4] Comparing settings...' -ForegroundColor Yellow
+Write-Host '[4/5] Comparing settings...' -ForegroundColor Yellow
 
 $comparisonResults = Compare-TenantSettings `
     -BaselineSettings $baselineSettings `
     -CustomerSettings $customerSettings
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Step 4 — Export
+# Step 5 — Export
 # ─────────────────────────────────────────────────────────────────────────────
 Write-Host ''
-Write-Host '[4/4] Exporting results...' -ForegroundColor Yellow
+Write-Host '[5/5] Exporting results...' -ForegroundColor Yellow
 
 $csvPath = Export-DiffCsv `
     -Results       $comparisonResults `
@@ -365,14 +394,46 @@ $csvPath = Export-DiffCsv `
     -CustomerName  $CustomerName `
     -BaselineLevel $BaselineLevel
 
-Write-Host "  CSV:  $csvPath" -ForegroundColor Green
+Write-Host "  Diff CSV:       $csvPath" -ForegroundColor Green
 
-if ($GenerateReportData) {
-    $jsonPath = Export-ReportData `
-        -Results       $comparisonResults `
+# Inventory CSVs
+if ($null -ne $deviceInventory -and $deviceInventory.Count -gt 0) {
+    $deviceCsvPath = Export-DeviceInventoryCsv `
+        -Devices       $deviceInventory `
         -OutputPath    $OutputPath `
         -CustomerName  $CustomerName `
         -BaselineLevel $BaselineLevel
+    Write-Host "  Device CSV:     $deviceCsvPath" -ForegroundColor Green
+}
+
+if ($null -ne $enrollmentData) {
+    $enrollmentPaths = Export-EnrollmentCsv `
+        -EnrollmentData $enrollmentData `
+        -OutputPath     $OutputPath `
+        -CustomerName   $CustomerName `
+        -BaselineLevel  $BaselineLevel
+    Write-Host "  Enrollment CSV: $($enrollmentPaths.ConfigsCsv)" -ForegroundColor Green
+    Write-Host "  Autopilot CSV:  $($enrollmentPaths.AutopilotCsv)" -ForegroundColor Green
+}
+
+if ($null -ne $appInventory -and $appInventory.Count -gt 0) {
+    $appCsvPath = Export-AppInventoryCsv `
+        -Apps          $appInventory `
+        -OutputPath    $OutputPath `
+        -CustomerName  $CustomerName `
+        -BaselineLevel $BaselineLevel
+    Write-Host "  App CSV:        $appCsvPath" -ForegroundColor Green
+}
+
+if ($GenerateReportData) {
+    $jsonPath = Export-ReportData `
+        -Results         $comparisonResults `
+        -OutputPath      $OutputPath `
+        -CustomerName    $CustomerName `
+        -BaselineLevel   $BaselineLevel `
+        -DeviceInventory $deviceInventory `
+        -EnrollmentData  $enrollmentData `
+        -AppInventory    $appInventory
     Write-Host "  JSON: $jsonPath" -ForegroundColor Green
 }
 
@@ -422,6 +483,22 @@ if ($domainGroups.Count -gt 0) {
         }
         Write-Host ("    {0,-32} Score {1}/5  [{2,3}% compliant, {3} settings]" -f `
             $d.Name, $score, $pct, $dt) -ForegroundColor $scoreColor
+    }
+}
+
+# Inventory summary
+if ($null -ne $deviceInventory -and $deviceInventory.Count -gt 0) {
+    Write-Host '───────────────────────────────────────────────────────' -ForegroundColor Cyan
+    Write-Host '  Inventory:' -ForegroundColor Cyan
+    $compliantDevices = @($deviceInventory | Where-Object { $_.ComplianceState -eq 'compliant' }).Count
+    Write-Host "    Devices: $($deviceInventory.Count) total, $compliantDevices compliant" -ForegroundColor White
+    if ($null -ne $enrollmentData) {
+        Write-Host "    Autopilot: $($enrollmentData.AutopilotDevices.Count) registered" -ForegroundColor White
+        Write-Host "    Enrollment configs: $($enrollmentData.EnrollmentConfigs.Count)" -ForegroundColor White
+    }
+    if ($null -ne $appInventory -and $appInventory.Count -gt 0) {
+        $assignedApps = @($appInventory | Where-Object { $_.IsAssigned -eq 'Yes' }).Count
+        Write-Host "    Apps: $($appInventory.Count) total, $assignedApps assigned" -ForegroundColor White
     }
 }
 
