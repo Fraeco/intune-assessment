@@ -105,8 +105,8 @@ $ErrorActionPreference = 'Stop'
 # ─────────────────────────────────────────────────────────────────────────────
 Write-Host ''
 Write-Host '╔══════════════════════════════════════════════════════╗' -ForegroundColor Cyan
-Write-Host '║    Intune Baseline Assessment Tool  v0.5.0           ║' -ForegroundColor Cyan
-Write-Host '║    Sprint 5 — +Inventory                             ║' -ForegroundColor Cyan
+Write-Host '║    Intune Baseline Assessment Tool  v0.6.0           ║' -ForegroundColor Cyan
+Write-Host '║    Sprint 6 — +Value Normalization                   ║' -ForegroundColor Cyan
 Write-Host '╚══════════════════════════════════════════════════════╝' -ForegroundColor Cyan
 Write-Host "  Customer      : $CustomerName" -ForegroundColor White
 Write-Host "  Tenant ID     : $CustomerTenantId" -ForegroundColor White

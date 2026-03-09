@@ -159,7 +159,13 @@ function Build-ComparisonRow {
     $compCatId    = $CustomerMatches[0].CategoryId
     $compDomain   = $CustomerMatches[0].Domain
 
-    # Compliant if ANY customer match equals the baseline value
+    # Multi-policy strategy: OPTIMISTIC — Compliant if ANY customer policy matches
+    # the baseline value for this setting. Rationale: when a setting is configured
+    # in multiple policies Intune applies the most-restrictive effective value, but
+    # we cannot reliably determine precedence via API alone. Flagging the setting
+    # Compliant when at least one policy matches avoids false-positive Conflicts for
+    # intentional policy layering (e.g. a broad base policy + a tighter scoped
+    # policy). Reviewers should inspect the full PolicyValue column for all values.
     $anyMatch = $CustomerMatches | Where-Object { Compare-SettingValue $_.Value $BaselineSetting.Value }
     $result   = if ($anyMatch) { 'Compliant' } else { 'Conflict' }
 
@@ -202,22 +208,66 @@ function Compare-SettingValue {
 function Normalize-SettingValue {
     <#
     .SYNOPSIS
-        Produces a canonical lowercase string for value comparison.
-        Common boolean synonyms are all mapped to 'true' or 'false'.
+        Produces a canonical string for value comparison.
+
+        Normalization steps applied in order:
+        1. Boolean synonyms  — true/1/enabled/yes/allow/on → 'true';
+                               false/0/disabled/no/block/off → 'false'
+        2. JSON object       — parsed and re-serialized with keys sorted
+                               alphabetically, so key order does not affect
+                               equality (e.g. {"b":1,"a":2} == {"a":2,"b":1})
+        3. JSON array        — elements sorted so array order does not affect
+                               equality (e.g. ["b","a"] == ["a","b"])
+        4. Comma-separated   — items split on ', ' and sorted; handles
+                               SimpleSettingCollectionInstance / ChoiceSettingCollectionInstance
+                               values produced by PolicyReader (e.g. "val2, val1" == "val1, val2")
+        5. Fallback          — ToLower() only
     #>
     param([string]$Value)
 
     if ([string]::IsNullOrWhiteSpace($Value)) { return '' }
 
-    $v = $Value.Trim().ToLower()
+    $v = $Value.Trim()
 
+    # ── Step 1: Boolean synonyms ──────────────────────────────────────────────
+    $vLower      = $v.ToLower()
     $trueValues  = @('true',  '1', 'enabled',  'yes', 'allow', 'on')
     $falseValues = @('false', '0', 'disabled', 'no',  'block', 'off')
 
-    if ($v -in $trueValues)  { return 'true'  }
-    if ($v -in $falseValues) { return 'false' }
+    if ($vLower -in $trueValues)  { return 'true'  }
+    if ($vLower -in $falseValues) { return 'false' }
 
-    return $v
+    # ── Step 2: JSON object — key-order-insensitive ───────────────────────────
+    if ($v.StartsWith('{') -and $v.EndsWith('}')) {
+        try {
+            $obj    = $v | ConvertFrom-Json -ErrorAction Stop
+            $sorted = [ordered]@{}
+            $obj.PSObject.Properties | Sort-Object Name | ForEach-Object { $sorted[$_.Name] = $_.Value }
+            return ($sorted | ConvertTo-Json -Compress -Depth 10).ToLower()
+        }
+        catch { <# not valid JSON — fall through #> }
+    }
+
+    # ── Step 3: JSON array — element-order-insensitive ────────────────────────
+    if ($v.StartsWith('[') -and $v.EndsWith(']')) {
+        try {
+            $arr    = @($v | ConvertFrom-Json -ErrorAction Stop)
+            $sorted = @($arr | Sort-Object { "$_".ToLower() })
+            return ($sorted | ConvertTo-Json -Compress -Depth 10).ToLower()
+        }
+        catch { <# not valid JSON — fall through #> }
+    }
+
+    # ── Step 4: Comma-separated collection — item-order-insensitive ──────────
+    # PolicyReader joins SimpleSettingCollectionInstance / ChoiceSettingCollectionInstance
+    # values with ', ' — sort items so ["A","B"] and ["B","A"] compare equal.
+    if ($v -match ',') {
+        $items = $v -split '\s*,\s*' | Where-Object { $_ -ne '' } | Sort-Object { $_.ToLower() }
+        return ($items -join ',').ToLower()
+    }
+
+    # ── Step 5: Fallback ──────────────────────────────────────────────────────
+    return $vLower
 }
 
 Export-ModuleMember -Function @(
