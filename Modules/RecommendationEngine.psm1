@@ -365,11 +365,12 @@ function Invoke-InventoryMetricFinding {
         [System.Collections.Generic.List[hashtable]]$AppInventory
     )
 
-    $trigger  = $Rule.trigger
-    $source   = $trigger.source
-    $field    = $trigger.field
-    $value    = $trigger.value
-    $operator = $trigger.operator
+    $trigger   = $Rule.trigger
+    $source    = $trigger.source
+    $field     = $trigger.field
+    $value     = $trigger.value
+    $operator  = $trigger.operator
+    $matchMode = if ($trigger.matchMode) { $trigger.matchMode } else { 'exact' }
     $threshold = [double]$trigger.threshold
 
     # Resolve the data collection
@@ -380,7 +381,7 @@ function Invoke-InventoryMetricFinding {
 
     if (-not $collection -or $collection.Count -eq 0) { return $null }
 
-    # Count items matching field=value (case-insensitive)
+    # Count items matching field=value using matchMode (case-insensitive)
     $matchCount = @($collection | Where-Object {
         $itemValue = ''
         if ($_ -is [hashtable]) {
@@ -388,7 +389,11 @@ function Invoke-InventoryMetricFinding {
         } elseif ($_.PSObject.Properties[$field]) {
             $itemValue = $_.$field
         }
-        "$itemValue" -eq "$value"
+        switch ($matchMode) {
+            'startsWith' { "$itemValue".StartsWith("$value", [System.StringComparison]::OrdinalIgnoreCase) }
+            'contains'   { "$itemValue".IndexOf("$value", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 }
+            default      { "$itemValue" -eq "$value" }
+        }
     }).Count
 
     $total = $collection.Count

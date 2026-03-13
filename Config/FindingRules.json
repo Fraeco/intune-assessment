@@ -5,7 +5,7 @@
   "comparisonFindings": [
     {
       "id": "laps-not-configured",
-      "name": "LAPS not configured",
+      "name": "LAPS niet geconfigureerd",
       "domain": "Endpoint Security",
       "severity": "Critical",
       "trigger": {
@@ -14,12 +14,12 @@
         "resultFilter": ["Missing"],
         "threshold": 0.8
       },
-      "detail": "Local Administrator Password Solution (LAPS) manages and automatically rotates local admin passwords on managed devices. Without LAPS, local admin passwords may be shared, static, or unknown across devices — creating lateral movement risk if a single device is compromised.",
-      "recommendation": "Deploy a LAPS policy via Settings Catalog to automatically rotate local administrator passwords on all managed Windows devices. Ensure backup to Azure AD and configure password complexity and rotation interval."
+      "detail": "Local Administrator Password Solution (LAPS) beheert en roteert automatisch lokale beheerderswachtwoorden op beheerde apparaten. Zonder LAPS kunnen lokale beheerderswachtwoorden gedeeld, statisch of onbekend zijn — wat een risico op laterale verplaatsing creëert als één apparaat wordt gecompromitteerd.",
+      "recommendation": "Deploy een LAPS-beleid via Settings Catalog om lokale beheerderswachtwoorden automatisch te roteren op alle beheerde Windows-apparaten. Zorg voor backup naar Azure AD en configureer wachtwoordcomplexiteit en rotatieinterval."
     },
     {
       "id": "bitlocker-gaps",
-      "name": "BitLocker not fully configured",
+      "name": "BitLocker onvolledig geconfigureerd",
       "domain": "Endpoint Security",
       "severity": "Critical",
       "trigger": {
@@ -28,12 +28,110 @@
         "resultFilter": ["Missing", "Conflict"],
         "threshold": 0.5
       },
-      "detail": "BitLocker drive encryption protects data at rest on Windows devices. {count} of {total} BitLocker-related settings are missing or misconfigured, leaving devices vulnerable to data exposure if lost or stolen.",
-      "recommendation": "Configure BitLocker policies to enforce full disk encryption on all managed Windows devices. Ensure recovery keys are backed up to Azure AD and configure appropriate encryption methods (XTS-AES 256-bit recommended)."
+      "detail": "BitLocker Drive Encryption beschermt gegevens in rust op Windows-apparaten. {count} van {total} BitLocker-gerelateerde instellingen ontbreken of zijn fout geconfigureerd, waardoor apparaten kwetsbaar zijn voor gegevensblootstelling bij verlies of diefstal.",
+      "recommendation": "Configureer BitLocker-beleid om volledige schijfversleuteling af te dwingen op alle beheerde Windows-apparaten. Zorg ervoor dat herstelsleutels worden opgeslagen in Azure AD en configureer de juiste versleutelingsmethoden (XTS-AES 256-bit aanbevolen)."
+    },
+    {
+      "id": "whfb-not-configured",
+      "name": "Windows Hello for Business niet geconfigureerd",
+      "domain": "Endpoint Security",
+      "severity": "Critical",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["WindowsHello", "HelloForBusiness", "WHfB", "PassportForWork"],
+        "resultFilter": ["Missing", "Conflict"],
+        "threshold": 0.6
+      },
+      "detail": "Windows Hello for Business (WHfB) vervangt wachtwoordgebaseerde authenticatie door sterke twee-factorauthenticatie gekoppeld aan een apparaat. {count} van {total} WHfB-gerelateerde instellingen ontbreken of zijn fout geconfigureerd. Zonder WHfB authenticeren gebruikers met wachtwoorden die kwetsbaar zijn voor phishing, credential stuffing en pass-the-hash-aanvallen.",
+      "recommendation": "Configureer een Windows Hello for Business-beleid via Settings Catalog. Schakel WHfB in met PIN-complexiteitsvereisten en, waar ondersteund, biometrische authenticatie. Zorg ervoor dat Entra ID-gekoppelde apparaten worden getarget en dat het beleid WHfB afdwingt als primaire aanmeldmethode."
+    },
+    {
+      "id": "office-macro-hardening-missing",
+      "name": "Office macro- en Trust Center-hardening ontbreekt",
+      "domain": "Endpoint Security",
+      "severity": "High",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["TrustCenter", "Macro", "VBA", "ActiveX", "VisualBasic"],
+        "resultFilter": ["Missing"],
+        "threshold": 0.5
+      },
+      "detail": "Microsoft Office Trust Center en macro-hardening-instellingen beheren één van de meest voorkomende initiële toegangsvectoren. {count} van {total} Office-hardening-instellingen zijn niet geconfigureerd. Onbeperkte macro's en ActiveX-besturingselementen in Office-toepassingen (Word, Excel, Outlook, PowerPoint) worden regelmatig misbruikt om kwaadaardige code uit te voeren.",
+      "recommendation": "Deploy Office hardening via Administrative Templates of Settings Catalog. Schakel macro's van het internet uit, blokkeer ActiveX-besturingselementen in Office-bestanden en configureer Trust Center-instellingen voor alle Office-toepassingen. Sluit aan bij CIS- of ACSC-richtlijnen voor Office hardening."
+    },
+    {
+      "id": "local-security-policy-gaps",
+      "name": "Lokaal beveiligingsbeleid ontbreekt",
+      "domain": "Endpoint Security",
+      "severity": "High",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["LocalPoliciesSecurityOptions", "LanmanServer", "LanmanWorkstation", "NetworkSecurity", "NTLMv2"],
+        "resultFilter": ["Missing", "Conflict"],
+        "threshold": 0.5
+      },
+      "detail": "Lokale beveiligingsbeleids-instellingen bepalen fundamenteel netwerkverificatie- en toegangsgedrag. {count} van {total} lokale beveiligingsbeleids-instellingen ontbreken of zijn fout geconfigureerd. Ontbrekende hardening op gebieden zoals SMB-ondertekening, LAN Manager-authenticatieniveau en beperkingen voor anonieme toegang worden vaak misbruikt voor laterale verplaatsing en credential relay-aanvallen.",
+      "recommendation": "Configureer Local Policies Security Options via Settings Catalog of Administrative Templates. Prioriteer SMB-ondertekening op zowel client als server, stel het LAN Manager-authenticatieniveau in op uitsluitend NTLMv2, schakel anonieme opsomming van SAM-accounts uit en beperk anonieme toegang tot named pipes en shares."
+    },
+    {
+      "id": "user-rights-not-configured",
+      "name": "User Rights Assignment niet geconfigureerd",
+      "domain": "Endpoint Security",
+      "severity": "Medium",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["UserRights", "UserRightsAssignment", "SeDebugPrivilege", "SeRemoteInteractiveLogon"],
+        "resultFilter": ["Missing"],
+        "threshold": 0.5
+      },
+      "detail": "User Rights Assignment-beleid bepaalt welke accounts geprivilegieerde acties mogen uitvoeren, zoals lokale aanmelding, Remote Desktop-toegang, het debuggen van programma's en het beheren van auditlogboeken. {count} van {total} User Rights Assignment-instellingen zijn niet geconfigureerd, waardoor deze bevoegdheden op Windows-standaardwaarden staan die mogelijk te ruim zijn.",
+      "recommendation": "Configureer User Rights Assignment-instellingen via Settings Catalog of Administrative Templates. Beperk debug-bevoegdheden tot uitsluitend beheerders, beperk de rechten voor interactieve aanmelding en aanmelding op afstand, en zorg ervoor dat serviceaccounts alleen de benodigde rechten hebben."
+    },
+    {
+      "id": "audit-policy-not-configured",
+      "name": "Auditbeleid niet geconfigureerd",
+      "domain": "Compliance & Governance",
+      "severity": "Medium",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["Auditing", "AuditPolicy", "SecurityAudit", "AuditLogon", "AuditAccountLogon"],
+        "resultFilter": ["Missing"],
+        "threshold": 0.5
+      },
+      "detail": "Windows-auditbeleid bepaalt welke beveiligingsgebeurtenissen worden geschreven naar het Security-gebeurtenislogboek. {count} van {total} auditbeleids-instellingen zijn niet geconfigureerd. Zonder adequate auditing kunnen beveiligingsincidenten niet worden gedetecteerd, onderzocht of gereconstrueerd — en voldoet de omgeving niet aan de logvereisten van NIS2, ISO 27001 of SOC 2.",
+      "recommendation": "Configureer Advanced Audit Policy-instellingen via Administrative Templates of Settings Catalog. Schakel auditing in voor aanmeldgebeurtenissen, accountbeheer, gebruik van bevoegdheden, het aanmaken van processen en beleidswijzigingen. Zorg ervoor dat logboeken worden doorgestuurd naar een centrale SIEM of Log Analytics-werkruimte."
+    },
+    {
+      "id": "edge-hardening-missing",
+      "name": "Microsoft Edge hardening niet geconfigureerd",
+      "domain": "Application Lifecycle",
+      "severity": "Medium",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["MicrosoftEdge", "Edge", "SmartScreen", "EdgeUpdate"],
+        "resultFilter": ["Missing"],
+        "threshold": 0.5
+      },
+      "detail": "Microsoft Edge is de primaire browser voor de meeste beheerde Windows-apparaten en een veelgebruikt beginpunt voor phishing, drive-by downloads en het stelen van inloggegevens. {count} van {total} Edge-hardening-instellingen zijn niet geconfigureerd. Zonder browserbeleid kunnen gebruikers onbedoeld kwaadaardige sites bezoeken, wachtwoorden onveilig opslaan of niet-vertrouwde extensies installeren.",
+      "recommendation": "Deploy Edge hardening via Administrative Templates of Settings Catalog. Schakel SmartScreen en phishingbeveiliging in, schakel de wachtwoordbeheerder uit of wijs door naar een bedrijfsreferentieopslagplaats, beperk de installatie van extensies tot goedgekeurde uitgevers en configureer veilige browserinstellingen. Raadpleeg Microsofts Edge-beveiligingsbasislijn als referentie."
+    },
+    {
+      "id": "onedrive-not-configured",
+      "name": "OneDrive-configuratie ontbreekt",
+      "domain": "Application Lifecycle",
+      "severity": "Low",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["OneDrive", "KnownFolderMove", "ODfB", "SharePoint"],
+        "resultFilter": ["Missing"],
+        "threshold": 0.5
+      },
+      "detail": "{count} van {total} OneDrive-configuratie-instellingen zijn niet geconfigureerd. Zonder beheerde OneDrive-instellingen wordt Known Folder Move mogelijk niet afgedwongen, waardoor Bureau, Documenten en Afbeeldingen onbeschermd blijven. Stille aanmelding en synchronisatiebeperkingen ontbreken ook, wat het risico op gegevensverlies en ongeautoriseerd gegevens delen vergroot.",
+      "recommendation": "Configureer OneDrive via Administrative Templates. Schakel Known Folder Move in (stil doorsturen van Bureau, Documenten en Afbeeldingen), configureer stille accountconfiguratie met Entra ID-inloggegevens en beperk delen tot interne gebruikers of goedgekeurde domeinen. Blokkeer de synchronisatie van persoonlijke OneDrive-accounts op beheerde apparaten."
     },
     {
       "id": "defender-gaps",
-      "name": "Windows Defender gaps",
+      "name": "Windows Defender-hiaten",
       "domain": "Endpoint Security",
       "severity": "High",
       "trigger": {
@@ -42,26 +140,26 @@
         "resultFilter": ["Missing", "Conflict"],
         "threshold": 0.4
       },
-      "detail": "Microsoft Defender Antivirus is the primary endpoint protection platform for Windows devices. {count} of {total} Defender-related settings are missing or misconfigured, potentially leaving devices without adequate real-time protection against malware and threats.",
-      "recommendation": "Review and configure all Defender Antivirus settings including real-time protection, cloud-delivered protection, automatic sample submission, and PUA detection. Align with Microsoft's recommended security baselines."
+      "detail": "Microsoft Defender Antivirus is het primaire eindpuntbeveiligingsplatform voor Windows-apparaten. {count} van {total} Defender-gerelateerde instellingen ontbreken of zijn fout geconfigureerd, waardoor apparaten mogelijk niet over adequate realtime bescherming beschikken tegen malware en bedreigingen.",
+      "recommendation": "Controleer en configureer alle Defender Antivirus-instellingen, waaronder realtime beveiliging, cloud-bescherming, automatische voorbeeldinzending en PUA-detectie. Sluit aan op de aanbevolen beveiligingsbasislijnen van Microsoft."
     },
     {
       "id": "firewall-gaps",
-      "name": "Firewall not configured",
+      "name": "Firewall niet geconfigureerd",
       "domain": "Endpoint Security",
       "severity": "High",
       "trigger": {
         "type": "keyword_cluster",
-        "keywords": ["Firewall"],
+        "keywords": ["Firewall", "MdmStore"],
         "resultFilter": ["Missing"],
         "threshold": 0.6
       },
-      "detail": "Windows Defender Firewall controls inbound and outbound network traffic. {count} of {total} firewall-related settings are missing, leaving devices without centrally managed network protection.",
-      "recommendation": "Deploy firewall policies for all three network profiles (Domain, Private, Public). Enable the firewall on all profiles and configure inbound/outbound rules appropriate for your environment."
+      "detail": "Windows Defender Firewall beheert inkomend en uitgaand netwerkverkeer. {count} van {total} firewall-gerelateerde instellingen ontbreken, waardoor apparaten verstoken blijven van centraal beheerde netwerkbeveiliging.",
+      "recommendation": "Deploy firewallbeleid voor alle drie netwerkprofielen (Domain, Private, Public). Schakel de firewall in op alle profielen en configureer inkomende en uitgaande regels die passend zijn voor uw omgeving."
     },
     {
       "id": "asr-not-configured",
-      "name": "Attack Surface Reduction gaps",
+      "name": "Attack Surface Reduction-hiaten",
       "domain": "Endpoint Security",
       "severity": "High",
       "trigger": {
@@ -70,12 +168,12 @@
         "resultFilter": ["Missing"],
         "threshold": 0.6
       },
-      "detail": "Attack Surface Reduction (ASR) rules block common attack techniques used by malware such as Office macro abuse, credential theft, and script-based attacks. {count} of {total} ASR-related settings are not configured.",
-      "recommendation": "Enable ASR rules in block mode for key attack vectors. Start with audit mode to assess impact, then transition to block mode. Prioritize rules for Office applications, script execution, and credential access."
+      "detail": "Attack Surface Reduction (ASR)-regels blokkeren veelgebruikte aanvalstechnieken door malware, zoals misbruik van Office-macro's, het stelen van inloggegevens en scriptgebaseerde aanvallen. {count} van {total} ASR-gerelateerde instellingen zijn niet geconfigureerd.",
+      "recommendation": "Schakel ASR-regels in de blokkeerstand in voor de belangrijkste aanvalsvectoren. Begin met de auditstand om de impact te beoordelen en schakel daarna over naar de blokkeerstand. Prioriteer regels voor Office-toepassingen, scriptuitvoering en toegang tot inloggegevens."
     },
     {
       "id": "device-restrictions-incomplete",
-      "name": "Device restrictions incomplete",
+      "name": "Apparaatbeperkingen onvolledig",
       "domain": "Device Management",
       "severity": "Medium",
       "trigger": {
@@ -84,12 +182,12 @@
         "resultFilter": ["Missing", "Conflict"],
         "threshold": 0.4
       },
-      "detail": "Device restriction policies control security-critical features like password requirements, screen lock, and hardware capabilities. {count} of {total} device restriction settings are missing or misconfigured.",
-      "recommendation": "Review device restriction policies and ensure password complexity, screen lock timeout, and hardware access controls are configured. Align settings with your organization's security requirements."
+      "detail": "Apparaatbeperkingsbeleid beheert beveiligingskritieke functies zoals wachtwoordvereisten, schermvergrendeling en hardwaremogelijkheden. {count} van {total} apparaatbeperkings-instellingen ontbreken of zijn fout geconfigureerd.",
+      "recommendation": "Controleer het apparaatbeperkingsbeleid en zorg ervoor dat wachtwoordcomplexiteit, time-out voor schermvergrendeling en hardwaretoegangscontroles zijn geconfigureerd. Stem de instellingen af op de beveiligingsvereisten van uw organisatie."
     },
     {
       "id": "windows-update-misconfigured",
-      "name": "Windows Update misconfigured",
+      "name": "Windows Update fout geconfigureerd",
       "domain": "Device Management",
       "severity": "Medium",
       "trigger": {
@@ -98,12 +196,12 @@
         "resultFilter": ["Missing", "Conflict"],
         "threshold": 0.4
       },
-      "detail": "Windows Update policies control how and when devices receive security patches and feature updates. {count} of {total} update-related settings are missing or misconfigured, potentially leaving devices unpatched.",
-      "recommendation": "Configure Windows Update for Business policies with appropriate deferral periods for quality and feature updates. Enable delivery optimization and configure maintenance windows to minimize user disruption."
+      "detail": "Windows Update-beleid bepaalt hoe en wanneer apparaten beveiligingspatches en functie-updates ontvangen. {count} van {total} update-gerelateerde instellingen ontbreken of zijn fout geconfigureerd, waardoor apparaten mogelijk niet worden gepatcht.",
+      "recommendation": "Configureer Windows Update for Business-beleid met passende uitstelperiodes voor kwaliteits- en functie-updates. Schakel Delivery Optimization in en configureer onderhoudvensters om gebruikersonderbreking te minimaliseren."
     },
     {
       "id": "app-protection-missing",
-      "name": "App protection gaps",
+      "name": "App protection-hiaten",
       "domain": "Application Lifecycle",
       "severity": "Medium",
       "trigger": {
@@ -112,12 +210,12 @@
         "resultFilter": ["Missing"],
         "threshold": 0.6
       },
-      "detail": "App protection policies (MAM) control data leakage from managed applications. {count} of {total} app protection settings are not configured, potentially allowing corporate data to be copied to unmanaged apps or locations.",
-      "recommendation": "Deploy app protection policies for key business applications (Outlook, Teams, OneDrive, Edge). Configure data transfer restrictions, PIN requirements, and conditional launch settings."
+      "detail": "App-beveiligingsbeleid (MAM) beheert gegevenslekken vanuit beheerde toepassingen. {count} van {total} app-beveiligingsinstellingen zijn niet geconfigureerd, waardoor bedrijfsgegevens mogelijk worden gekopieerd naar onbeheerde apps of locaties.",
+      "recommendation": "Deploy app-beveiligingsbeleid voor de belangrijkste zakelijke toepassingen (Outlook, Teams, OneDrive, Edge). Configureer beperkingen voor gegevensoverdracht, PIN-vereisten en instellingen voor conditioneel starten."
     },
     {
       "id": "compliance-coverage-low",
-      "name": "Compliance policy coverage low",
+      "name": "Compliancebeleid-dekking te laag",
       "domain": "Compliance & Governance",
       "severity": "High",
       "trigger": {
@@ -126,12 +224,12 @@
         "resultFilter": ["Missing"],
         "threshold": 0.4
       },
-      "detail": "More than {percent}% of baseline compliance settings are missing in the customer tenant. Compliance policies are essential for enforcing security requirements and controlling access via Conditional Access.",
-      "recommendation": "Review and deploy compliance policies covering OS version requirements, encryption status, password complexity, firewall state, and Defender status. Link compliance policies to Conditional Access for enforcement."
+      "detail": "Meer dan {percent}% van de baseline-complianceinstellingen ontbreken in de klanttenant. Compliancebeleid is essentieel voor het afdwingen van beveiligingsvereisten en het beheren van toegang via Conditional Access.",
+      "recommendation": "Controleer en deploy compliancebeleid voor OS-versievereisten, versleutelingsstatus, wachtwoordcomplexiteit, firewallstatus en Defender-status. Koppel compliancebeleid aan Conditional Access voor handhaving."
     },
     {
       "id": "endpoint-security-low",
-      "name": "Critical Endpoint Security gaps",
+      "name": "Kritieke Endpoint Security-hiaten",
       "domain": "Endpoint Security",
       "severity": "Critical",
       "trigger": {
@@ -140,44 +238,71 @@
         "resultFilter": ["Missing", "Conflict"],
         "threshold": 0.5
       },
-      "detail": "More than {percent}% of baseline Endpoint Security settings are missing or misconfigured. This domain covers antivirus, firewall, encryption, and attack surface reduction — the core security controls for managed devices.",
-      "recommendation": "Prioritize Endpoint Security policy deployment. Address missing Defender, Firewall, BitLocker, and ASR configurations. Consider using Microsoft's security baselines as a starting point."
+      "detail": "Meer dan {percent}% van de baseline Endpoint Security-instellingen ontbreken of zijn fout geconfigureerd. Dit domein omvat antivirus, firewall, versleuteling en Attack Surface Reduction — de kernbeveiligingscontroles voor beheerde apparaten.",
+      "recommendation": "Prioriteer de implementatie van Endpoint Security-beleid. Los ontbrekende Defender-, Firewall-, BitLocker- en ASR-configuraties op. Overweeg de beveiligingsbasislijnen van Microsoft als uitgangspunt te gebruiken."
+    },
+    {
+      "id": "device-management-coverage-low",
+      "name": "Device Management-dekking te laag",
+      "domain": "Device Management",
+      "severity": "Medium",
+      "trigger": {
+        "type": "domain_ratio",
+        "domain": "Device Management",
+        "resultFilter": ["Missing", "Conflict"],
+        "threshold": 0.5
+      },
+      "detail": "Meer dan {percent}% van de baseline Device Management-instellingen ontbreken of zijn fout geconfigureerd. Dit domein omvat update-beleid, apparaatbeperkingen en hardwarecontroles.",
+      "recommendation": "Controleer Device Management-beleid voor Windows Update-ringen, apparaatbeperkingen en hardwaretoegangscontroles. Prioriteer update-beleid om ervoor te zorgen dat apparaten beveiligingspatches ontvangen."
+    },
+    {
+      "id": "application-lifecycle-coverage-low",
+      "name": "Application Lifecycle-dekking te laag",
+      "domain": "Application Lifecycle",
+      "severity": "Low",
+      "trigger": {
+        "type": "domain_ratio",
+        "domain": "Application Lifecycle",
+        "resultFilter": ["Missing"],
+        "threshold": 0.5
+      },
+      "detail": "Meer dan {percent}% van de baseline Application Lifecycle-instellingen ontbreken. Dit domein omvat app-implementatie, app-beveiligingsbeleid en browserhardening.",
+      "recommendation": "Controleer Application Lifecycle-beleid voor app-beveiliging (MAM), browserhardening (Edge) en app-implementatie. Zorg ervoor dat de belangrijkste zakelijke toepassingen een geconfigureerd beveiligingsbeleid hebben."
     }
   ],
 
   "structuralFindings": [
     {
       "id": "no-naming-convention",
-      "name": "No consistent naming convention",
+      "name": "Geen consistente naamgevingsconventie",
       "domain": "Operations & Monitoring",
       "severity": "Medium",
       "trigger": {
         "type": "naming_convention",
         "patterns": ["SBZ-*", "SBZ-Win-*", "*-L1-*", "*-L2-*", "*-L3-*", "*-L4-*"],
-        "scope": "customer",
         "threshold": 0.5
       },
-      "detail": "Fewer than {percent}% of customer policies follow a recognizable naming convention. Without consistent naming, policy management, troubleshooting, and auditing become significantly harder as the environment grows.",
-      "recommendation": "Adopt a structured naming convention such as {Prefix}-{OS}-{Level}-{Domain}-{Name}-{Version} for all Intune policies. Rename existing policies to follow the chosen convention."
+      "detail": "Minder dan {percent}% van de klantbeleidsregels volgt een herkenbare naamgevingsconventie. Zonder consistente naamgeving worden beleidsbeheer, probleemoplossing en auditing aanzienlijk moeilijker naarmate de omgeving groeit.",
+      "recommendation": "Adopteer een gestructureerde naamgevingsconventie zoals {Prefix}-{OS}-{Level}-{Domain}-{Name}-{Version} voor alle Intune-beleidsregels. Hernoem bestaande beleidsregels om de gekozen conventie te volgen."
     },
     {
       "id": "duplicate-policy-coverage",
-      "name": "Overlapping policy settings",
+      "name": "Overlappende beleidsinstelling",
       "domain": "Operations & Monitoring",
       "severity": "Low",
       "trigger": {
         "type": "duplicate_coverage",
         "threshold": 10
       },
-      "detail": "{count} settings are configured in multiple customer policies with different values. This creates ambiguity about the effective configuration and may cause unexpected behavior depending on policy precedence.",
-      "recommendation": "Review overlapping policies and consolidate settings to avoid conflicts. Use Intune's policy conflict reporting to identify which policies are winning. Consider merging overlapping policies where possible."
+      "detail": "{count} instellingen zijn geconfigureerd in meerdere klantbeleidsregels met verschillende waarden. Dit creëert onduidelijkheid over de effectieve configuratie en kan onverwacht gedrag veroorzaken afhankelijk van beleidsvoorkeur.",
+      "recommendation": "Controleer overlappende beleidsregels en consolideer instellingen om conflicten te vermijden. Gebruik Intune's rapportage over beleidsconflicten om te bepalen welk beleid van toepassing is. Overweeg overlappende beleidsregels samen te voegen waar mogelijk."
     }
   ],
 
   "inventoryFindings": [
     {
       "id": "devices-noncompliant",
-      "name": "Devices out of compliance",
+      "name": "Apparaten buiten compliance",
       "domain": "Compliance & Governance",
       "severity": "High",
       "trigger": {
@@ -188,24 +313,56 @@
         "operator": "percent_gte",
         "threshold": 0.1
       },
-      "detail": "{count} of {total} managed devices ({percent}%) are currently non-compliant. Non-compliant devices may not meet security requirements and, if Conditional Access is configured, could lose access to corporate resources.",
-      "recommendation": "Investigate non-compliant devices to identify root causes (outdated OS, missing encryption, failed health checks). Address systemic issues first, then target individual devices. Consider grace periods for new compliance policies."
+      "detail": "{count} van {total} beheerde apparaten ({percent}%) zijn momenteel niet-compliant. Niet-compliant apparaten voldoen mogelijk niet aan beveiligingsvereisten en kunnen, als Conditional Access is geconfigureerd, de toegang tot bedrijfsmiddelen verliezen.",
+      "recommendation": "Onderzoek niet-compliant apparaten om de oorzaken te achterhalen (verouderd OS, ontbrekende versleuteling, mislukte gezondheidscontroles). Los eerst systemische problemen op en richt u daarna op individuele apparaten. Overweeg respijtperiodes voor nieuwe compliancebeleidsregels."
+    },
+    {
+      "id": "devices-unknown-compliance",
+      "name": "Apparaten met onbekende compliancestatus",
+      "domain": "Compliance & Governance",
+      "severity": "Medium",
+      "trigger": {
+        "type": "inventory_metric",
+        "source": "devices",
+        "field": "ComplianceState",
+        "value": "unknown",
+        "operator": "percent_gte",
+        "threshold": 0.05
+      },
+      "detail": "{count} van {total} beheerde apparaten ({percent}%) hebben een onbekende compliancestatus. Deze apparaten zijn nog niet beoordeeld op basis van een compliancebeleid, of hun laatste compliancecontrole is verlopen. Conditional Access behandelt onbekende apparaten als niet-compliant in strikte configuraties.",
+      "recommendation": "Onderzoek apparaten met een onbekende compliancestatus. Zorg ervoor dat alle apparaten zijn gekoppeld aan ten minste één compliancebeleid en dat ze regelmatig synchroniseren met Intune. Controleer de toewijzingsomvang van het compliancebeleid om te bevestigen dat geen apparaten zijn uitgesloten."
     },
     {
       "id": "no-autopilot",
-      "name": "No Autopilot enrollment",
+      "name": "Geen Autopilot-registratie",
       "domain": "Operations & Monitoring",
       "severity": "Medium",
       "trigger": {
         "type": "inventory_empty",
         "source": "autopilotDevices"
       },
-      "detail": "No Windows Autopilot device identities are registered. Without Autopilot, device provisioning is manual and inconsistent, increasing deployment time and the risk of misconfiguration.",
-      "recommendation": "Register devices in Windows Autopilot for zero-touch provisioning. Configure an Autopilot deployment profile with the appropriate user-driven or self-deploying mode. Import device hardware hashes from your OEM or existing fleet."
+      "detail": "Er zijn geen Windows Autopilot-apparaat-identiteiten geregistreerd. Zonder Autopilot is apparaatinrichting handmatig en inconsistent, wat de implementatietijd vergroot en het risico op misconfiguratie verhoogt.",
+      "recommendation": "Registreer apparaten in Windows Autopilot voor zero-touch provisioning. Configureer een Autopilot-implementatieprofiel met de juiste user-driven of self-deploying modus. Importeer apparaathardware-hashes van uw OEM of bestaand machinepark."
+    },
+    {
+      "id": "legacy-msi-apps",
+      "name": "Verouderde MSI-app-implementaties in gebruik",
+      "domain": "Application Lifecycle",
+      "severity": "Low",
+      "trigger": {
+        "type": "inventory_metric",
+        "source": "apps",
+        "field": "App Type",
+        "value": "windowsMobileMSI",
+        "operator": "count_gte",
+        "threshold": 1
+      },
+      "detail": "{count} applicatie(s) worden geïmplementeerd met het verouderde Line-of-Business MSI-type. Deze implementatiemethode is verouderd en mist belangrijke mogelijkheden zoals installatiedetectieregels, herprobeerlogica, afhankelijkheidsbeheer en supersedence — waardoor implementaties onbetrouwbaar en moeilijk te troubleshooten zijn.",
+      "recommendation": "Migreer verouderde MSI-implementaties naar het Win32-app-type. Herpaketeer applicaties met de Win32 Content Prep Tool (IntuneWinAppUtil.exe) voor volledige implementatiecontrole, inclusief detectieregels, vereisten, afhankelijkheden en supersedence-ketens."
     },
     {
       "id": "unassigned-apps",
-      "name": "Unassigned applications",
+      "name": "Niet-toegewezen applicaties",
       "domain": "Application Lifecycle",
       "severity": "Low",
       "trigger": {
@@ -216,24 +373,25 @@
         "operator": "percent_gte",
         "threshold": 0.3
       },
-      "detail": "{count} of {total} applications ({percent}%) in Intune have no assignments. Unassigned apps add management overhead without delivering value and may indicate incomplete deployment or orphaned configurations.",
-      "recommendation": "Review unassigned applications and either assign them to appropriate groups or remove them from Intune to reduce clutter. Establish an app lifecycle process for regular cleanup."
+      "detail": "{count} van {total} applicaties ({percent}%) in Intune hebben geen toewijzingen. Niet-toegewezen apps voegen beheeroverhead toe zonder waarde te leveren en kunnen duiden op een onvolledige implementatie of verweesde configuraties.",
+      "recommendation": "Controleer niet-toegewezen applicaties en wijs ze toe aan de juiste groepen of verwijder ze uit Intune om rommel te verminderen. Stel een app-lifecycleproces in voor regelmatige opschoning."
     },
     {
       "id": "outdated-os",
-      "name": "Outdated OS versions",
+      "name": "Verouderde OS-versies",
       "domain": "Device Management",
       "severity": "Medium",
       "trigger": {
         "type": "inventory_metric",
         "source": "devices",
-        "field": "OperatingSystem",
-        "value": "Windows 10",
+        "field": "OsVersion",
+        "value": "10.0.",
+        "matchMode": "startsWith",
         "operator": "percent_gte",
         "threshold": 0.1
       },
-      "detail": "{count} of {total} devices ({percent}%) are running Windows 10 which is approaching or past end of support. Devices on unsupported OS versions no longer receive security updates.",
-      "recommendation": "Plan and execute a migration to Windows 11 for all eligible devices. Use Windows Autopilot and feature update policies to streamline the upgrade process. For ineligible hardware, plan device refresh cycles."
+      "detail": "{count} van {total} apparaten ({percent}%) draaien Windows 10, dat het einde van de ondersteuning nadert of al voorbij is. Apparaten op niet-ondersteunde OS-versies ontvangen geen beveiligingsupdates meer.",
+      "recommendation": "Plan en voer een migratie naar Windows 11 uit voor alle geschikte apparaten. Gebruik Windows Autopilot en functie-updatebeleid om het upgradeproces te stroomlijnen. Plan voor niet-geschikte hardware vervanging van apparaten."
     }
   ]
 }
