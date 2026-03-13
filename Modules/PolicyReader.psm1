@@ -121,8 +121,24 @@ function Get-PolicySettings {
         [string]$Token,
         [string]$BaseUrl
     )
-    $url = "$BaseUrl/deviceManagement/configurationPolicies/$PolicyId/settings"
-    return Get-GraphPagedResults -Uri $url -Token $Token
+    # Use $expand=settingDefinitions to fetch definitions inline (avoids N+1 API calls)
+    $url = "$BaseUrl/deviceManagement/configurationPolicies/$PolicyId/settings" +
+           '?$expand=settingDefinitions'
+    $settings = Get-GraphPagedResults -Uri $url -Token $Token
+
+    # Pre-populate the definition cache from inline definitions
+    foreach ($setting in $settings) {
+        if ($null -ne $setting.settingDefinitions) {
+            foreach ($def in $setting.settingDefinitions) {
+                $defId = $def.id
+                if ($defId -and -not $script:DefinitionCache.ContainsKey($defId)) {
+                    $script:DefinitionCache[$defId] = $def
+                }
+            }
+        }
+    }
+
+    return $settings
 }
 
 # ---------------------------------------------------------------------------

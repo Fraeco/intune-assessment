@@ -422,5 +422,13 @@
     "synchronization of browser": "Application Lifecycle",
     "Sites to open when the browser starts": "Application Lifecycle",
     "single sign-on for work or school": "Endpoint Security"
+  },
+  "riskWeights": {
+    "_comment": "Domain criticality weights used for finding severity tiebreaking. Higher weight = higher priority when findings have the same severity level.",
+    "Endpoint Security": 5,
+    "Compliance & Governance": 4,
+    "Device Management": 3,
+    "Application Lifecycle": 2,
+    "Operations & Monitoring": 1
   }
 }

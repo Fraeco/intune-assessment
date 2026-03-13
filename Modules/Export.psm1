@@ -250,7 +250,8 @@ function Export-ReportData {
 
         [System.Collections.Generic.List[hashtable]]$DeviceInventory = $null,
         [hashtable]$EnrollmentData = $null,
-        [System.Collections.Generic.List[hashtable]]$AppInventory = $null
+        [System.Collections.Generic.List[hashtable]]$AppInventory = $null,
+        [System.Collections.Generic.List[hashtable]]$Findings = $null
     )
 
     if (-not (Test-Path $OutputPath)) {
@@ -336,6 +337,58 @@ function Export-ReportData {
             ByAppType      = $typeSummary
             Apps           = @($AppInventory)
         }
+    }
+
+    # Findings sections (optional — only present when findings engine ran)
+    if ($null -ne $Findings -and $Findings.Count -gt 0) {
+        # Executive summary — top 3 findings by severity
+        $topRisks = @($Findings | Select-Object -First 3 | ForEach-Object {
+            [ordered]@{
+                FindingName    = $_.FindingName
+                Domain         = $_.Domain
+                Severity       = $_.Severity
+                Detail         = $_.Detail
+                Recommendation = $_.Recommendation
+            }
+        })
+
+        $reportData['ExecutiveSummary'] = [ordered]@{
+            TopRisks = $topRisks
+        }
+
+        # Finding summary — counts by severity
+        $bySeverity = [ordered]@{ Critical = 0; High = 0; Medium = 0; Low = 0 }
+        foreach ($f in $Findings) {
+            if ($bySeverity.Contains($f.Severity)) {
+                $bySeverity[$f.Severity]++
+            }
+        }
+
+        $reportData['FindingSummary'] = [ordered]@{
+            Total      = $Findings.Count
+            BySeverity = $bySeverity
+        }
+
+        # Findings grouped by domain, sorted by severity within each domain
+        $domainFindings = [ordered]@{}
+        $grouped = $Findings | Group-Object Domain | Sort-Object Name
+        foreach ($g in $grouped) {
+            $domainFindings[$g.Name] = @($g.Group | Sort-Object @{
+                Expression = { $_.SeverityScore }; Descending = $true
+            } | ForEach-Object {
+                [ordered]@{
+                    FindingId      = $_.FindingId
+                    FindingName    = $_.FindingName
+                    Severity       = $_.Severity
+                    Detail         = $_.Detail
+                    Recommendation = $_.Recommendation
+                    AffectedCount  = $_.AffectedCount
+                    Category       = $_.Category
+                }
+            })
+        }
+
+        $reportData['FindingsByDomain'] = $domainFindings
     }
 
     $timestamp = Get-Date -Format 'yyyyMMdd'

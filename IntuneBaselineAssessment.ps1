@@ -5,9 +5,9 @@
     the eVri hardened baseline and exports a diff CSV for the assessment report.
 
 .DESCRIPTION
-    Sprint 5 scope: Settings Catalog, Endpoint Security (intents), Device
+    Sprint 7 scope: Settings Catalog, Endpoint Security (intents), Device
     Configuration, Admin Templates, Compliance Policies, Security Baselines,
-    plus device/enrollment/application inventory.
+    device/enrollment/application inventory, and findings engine with risk scoring.
 
 .PARAMETER CustomerTenantId
     Azure AD Tenant ID (GUID) of the customer tenant to assess.
@@ -105,8 +105,8 @@ $ErrorActionPreference = 'Stop'
 # ─────────────────────────────────────────────────────────────────────────────
 Write-Host ''
 Write-Host '╔══════════════════════════════════════════════════════╗' -ForegroundColor Cyan
-Write-Host '║    Intune Baseline Assessment Tool  v0.6.0           ║' -ForegroundColor Cyan
-Write-Host '║    Sprint 6 — +Value Normalization                   ║' -ForegroundColor Cyan
+Write-Host '║    Intune Baseline Assessment Tool  v0.7.0           ║' -ForegroundColor Cyan
+Write-Host '║    Sprint 7 — +Findings Engine                       ║' -ForegroundColor Cyan
 Write-Host '╚══════════════════════════════════════════════════════╝' -ForegroundColor Cyan
 Write-Host "  Customer      : $CustomerName" -ForegroundColor White
 Write-Host "  Tenant ID     : $CustomerTenantId" -ForegroundColor White
@@ -121,7 +121,7 @@ Write-Host ''
 # ─────────────────────────────────────────────────────────────────────────────
 $moduleRoot = Join-Path $PSScriptRoot 'Modules'
 
-foreach ($moduleName in @('Auth', 'GraphAPI', 'PolicyReader', 'EndpointSecurityReader', 'DeviceConfigReader', 'AdminTemplateReader', 'CompliancePolicyReader', 'SecurityBaselineReader', 'DeviceInventoryReader', 'EnrollmentAnalyzer', 'AppInventoryReader', 'Comparison', 'Enrichment', 'Export')) {
+foreach ($moduleName in @('Auth', 'GraphAPI', 'PolicyReader', 'EndpointSecurityReader', 'DeviceConfigReader', 'AdminTemplateReader', 'CompliancePolicyReader', 'SecurityBaselineReader', 'DeviceInventoryReader', 'EnrollmentAnalyzer', 'AppInventoryReader', 'Comparison', 'Enrichment', 'RecommendationEngine', 'Export')) {
     $modulePath = Join-Path $moduleRoot "$moduleName.psm1"
     if (-not (Test-Path $modulePath)) {
         throw "Required module not found: $modulePath"
@@ -155,6 +155,15 @@ $baseUrl = "$($configHash['GraphBaseUrl'])/$($configHash['GraphApiVersion'])"
 # Load domain mapping
 $domainMappingFile = Join-Path $ConfigPath 'DomainMapping.json'
 Initialize-DomainMapping -MappingPath $domainMappingFile
+
+# Load finding rules + risk weights
+$findingRulesFile = Join-Path $ConfigPath 'FindingRules.json'
+$domainMappingObj = Get-Content $domainMappingFile -Raw | ConvertFrom-Json
+$riskWeights = @{}
+if ($domainMappingObj.PSObject.Properties['riskWeights']) {
+    $domainMappingObj.riskWeights.PSObject.Properties | ForEach-Object { $riskWeights[$_.Name] = $_.Value }
+}
+Initialize-FindingRules -RulesPath $findingRulesFile -RiskWeights $riskWeights
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Private helper — fetches all requested policy types and aggregates results
@@ -382,6 +391,26 @@ $comparisonResults = Compare-TenantSettings `
     -BaselineSettings $baselineSettings `
     -CustomerSettings $customerSettings
 
+# Evaluate findings
+Write-Host '  Evaluating findings...' -ForegroundColor DarkGray
+$findings = Get-Findings `
+    -ComparisonResults $comparisonResults `
+    -CustomerSettings  $customerSettings `
+    -DeviceInventory   $deviceInventory `
+    -EnrollmentData    $enrollmentData `
+    -AppInventory      $appInventory
+
+$fCritical = @($findings | Where-Object { $_.Severity -eq 'Critical' }).Count
+$fHigh     = @($findings | Where-Object { $_.Severity -eq 'High'     }).Count
+$fMedium   = @($findings | Where-Object { $_.Severity -eq 'Medium'   }).Count
+$fLow      = @($findings | Where-Object { $_.Severity -eq 'Low'      }).Count
+
+if ($findings.Count -gt 0) {
+    Write-Host "  $($findings.Count) findings: $fCritical Critical, $fHigh High, $fMedium Medium, $fLow Low" -ForegroundColor Yellow
+} else {
+    Write-Host '  No findings triggered.' -ForegroundColor Green
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Step 5 — Export
 # ─────────────────────────────────────────────────────────────────────────────
@@ -433,7 +462,8 @@ if ($GenerateReportData) {
         -BaselineLevel   $BaselineLevel `
         -DeviceInventory $deviceInventory `
         -EnrollmentData  $enrollmentData `
-        -AppInventory    $appInventory
+        -AppInventory    $appInventory `
+        -Findings        $findings
     Write-Host "  JSON: $jsonPath" -ForegroundColor Green
 }
 
@@ -483,6 +513,24 @@ if ($domainGroups.Count -gt 0) {
         }
         Write-Host ("    {0,-32} Score {1}/5  [{2,3}% compliant, {3} settings]" -f `
             $d.Name, $score, $pct, $dt) -ForegroundColor $scoreColor
+    }
+}
+
+# Findings summary
+if ($findings.Count -gt 0) {
+    Write-Host '───────────────────────────────────────────────────────' -ForegroundColor Cyan
+    Write-Host '  Findings:' -ForegroundColor Cyan
+    Write-Host ("    Critical: {0}  High: {1}  Medium: {2}  Low: {3}" -f $fCritical, $fHigh, $fMedium, $fLow) -ForegroundColor White
+    # Show top 3 findings
+    $topFindings = @($findings | Select-Object -First 3)
+    foreach ($f in $topFindings) {
+        $sevColor = switch ($f.Severity) {
+            'Critical' { 'Red'        }
+            'High'     { 'DarkYellow' }
+            'Medium'   { 'Yellow'     }
+            'Low'      { 'Gray'       }
+        }
+        Write-Host ("    [{0}] {1}" -f $f.Severity, $f.FindingName) -ForegroundColor $sevColor
     }
 }
 

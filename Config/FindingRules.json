@@ -1,0 +1,239 @@
+{
+  "_comment": "FindingRules.json — Defines aggregated findings for the assessment report.",
+  "_comment2": "Three categories: comparisonFindings (from diff results), structuralFindings (metadata patterns), inventoryFindings (inventory thresholds).",
+
+  "comparisonFindings": [
+    {
+      "id": "laps-not-configured",
+      "name": "LAPS not configured",
+      "domain": "Endpoint Security",
+      "severity": "Critical",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["LAPS", "LocalAdminPassword"],
+        "resultFilter": ["Missing"],
+        "threshold": 0.8
+      },
+      "detail": "Local Administrator Password Solution (LAPS) manages and automatically rotates local admin passwords on managed devices. Without LAPS, local admin passwords may be shared, static, or unknown across devices — creating lateral movement risk if a single device is compromised.",
+      "recommendation": "Deploy a LAPS policy via Settings Catalog to automatically rotate local administrator passwords on all managed Windows devices. Ensure backup to Azure AD and configure password complexity and rotation interval."
+    },
+    {
+      "id": "bitlocker-gaps",
+      "name": "BitLocker not fully configured",
+      "domain": "Endpoint Security",
+      "severity": "Critical",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["BitLocker", "Encryption", "FDE", "DiskEncryption"],
+        "resultFilter": ["Missing", "Conflict"],
+        "threshold": 0.5
+      },
+      "detail": "BitLocker drive encryption protects data at rest on Windows devices. {count} of {total} BitLocker-related settings are missing or misconfigured, leaving devices vulnerable to data exposure if lost or stolen.",
+      "recommendation": "Configure BitLocker policies to enforce full disk encryption on all managed Windows devices. Ensure recovery keys are backed up to Azure AD and configure appropriate encryption methods (XTS-AES 256-bit recommended)."
+    },
+    {
+      "id": "defender-gaps",
+      "name": "Windows Defender gaps",
+      "domain": "Endpoint Security",
+      "severity": "High",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["Defender", "Antivirus", "RealTimeMonitoring", "CloudProtection", "AntiMalware"],
+        "resultFilter": ["Missing", "Conflict"],
+        "threshold": 0.4
+      },
+      "detail": "Microsoft Defender Antivirus is the primary endpoint protection platform for Windows devices. {count} of {total} Defender-related settings are missing or misconfigured, potentially leaving devices without adequate real-time protection against malware and threats.",
+      "recommendation": "Review and configure all Defender Antivirus settings including real-time protection, cloud-delivered protection, automatic sample submission, and PUA detection. Align with Microsoft's recommended security baselines."
+    },
+    {
+      "id": "firewall-gaps",
+      "name": "Firewall not configured",
+      "domain": "Endpoint Security",
+      "severity": "High",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["Firewall"],
+        "resultFilter": ["Missing"],
+        "threshold": 0.6
+      },
+      "detail": "Windows Defender Firewall controls inbound and outbound network traffic. {count} of {total} firewall-related settings are missing, leaving devices without centrally managed network protection.",
+      "recommendation": "Deploy firewall policies for all three network profiles (Domain, Private, Public). Enable the firewall on all profiles and configure inbound/outbound rules appropriate for your environment."
+    },
+    {
+      "id": "asr-not-configured",
+      "name": "Attack Surface Reduction gaps",
+      "domain": "Endpoint Security",
+      "severity": "High",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["AttackSurfaceReduction", "ASR", "ExploitGuard", "ExploitProtection"],
+        "resultFilter": ["Missing"],
+        "threshold": 0.6
+      },
+      "detail": "Attack Surface Reduction (ASR) rules block common attack techniques used by malware such as Office macro abuse, credential theft, and script-based attacks. {count} of {total} ASR-related settings are not configured.",
+      "recommendation": "Enable ASR rules in block mode for key attack vectors. Start with audit mode to assess impact, then transition to block mode. Prioritize rules for Office applications, script execution, and credential access."
+    },
+    {
+      "id": "device-restrictions-incomplete",
+      "name": "Device restrictions incomplete",
+      "domain": "Device Management",
+      "severity": "Medium",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["DeviceRestriction", "DeviceLock", "Password", "ScreenLock", "DeviceGuard"],
+        "resultFilter": ["Missing", "Conflict"],
+        "threshold": 0.4
+      },
+      "detail": "Device restriction policies control security-critical features like password requirements, screen lock, and hardware capabilities. {count} of {total} device restriction settings are missing or misconfigured.",
+      "recommendation": "Review device restriction policies and ensure password complexity, screen lock timeout, and hardware access controls are configured. Align settings with your organization's security requirements."
+    },
+    {
+      "id": "windows-update-misconfigured",
+      "name": "Windows Update misconfigured",
+      "domain": "Device Management",
+      "severity": "Medium",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["WindowsUpdate", "Update", "DeliveryOptimization", "UpdateRing"],
+        "resultFilter": ["Missing", "Conflict"],
+        "threshold": 0.4
+      },
+      "detail": "Windows Update policies control how and when devices receive security patches and feature updates. {count} of {total} update-related settings are missing or misconfigured, potentially leaving devices unpatched.",
+      "recommendation": "Configure Windows Update for Business policies with appropriate deferral periods for quality and feature updates. Enable delivery optimization and configure maintenance windows to minimize user disruption."
+    },
+    {
+      "id": "app-protection-missing",
+      "name": "App protection gaps",
+      "domain": "Application Lifecycle",
+      "severity": "Medium",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["AppProtection", "ManagedApp", "MAM", "DataProtection"],
+        "resultFilter": ["Missing"],
+        "threshold": 0.6
+      },
+      "detail": "App protection policies (MAM) control data leakage from managed applications. {count} of {total} app protection settings are not configured, potentially allowing corporate data to be copied to unmanaged apps or locations.",
+      "recommendation": "Deploy app protection policies for key business applications (Outlook, Teams, OneDrive, Edge). Configure data transfer restrictions, PIN requirements, and conditional launch settings."
+    },
+    {
+      "id": "compliance-coverage-low",
+      "name": "Compliance policy coverage low",
+      "domain": "Compliance & Governance",
+      "severity": "High",
+      "trigger": {
+        "type": "domain_ratio",
+        "domain": "Compliance & Governance",
+        "resultFilter": ["Missing"],
+        "threshold": 0.4
+      },
+      "detail": "More than {percent}% of baseline compliance settings are missing in the customer tenant. Compliance policies are essential for enforcing security requirements and controlling access via Conditional Access.",
+      "recommendation": "Review and deploy compliance policies covering OS version requirements, encryption status, password complexity, firewall state, and Defender status. Link compliance policies to Conditional Access for enforcement."
+    },
+    {
+      "id": "endpoint-security-low",
+      "name": "Critical Endpoint Security gaps",
+      "domain": "Endpoint Security",
+      "severity": "Critical",
+      "trigger": {
+        "type": "domain_ratio",
+        "domain": "Endpoint Security",
+        "resultFilter": ["Missing", "Conflict"],
+        "threshold": 0.5
+      },
+      "detail": "More than {percent}% of baseline Endpoint Security settings are missing or misconfigured. This domain covers antivirus, firewall, encryption, and attack surface reduction — the core security controls for managed devices.",
+      "recommendation": "Prioritize Endpoint Security policy deployment. Address missing Defender, Firewall, BitLocker, and ASR configurations. Consider using Microsoft's security baselines as a starting point."
+    }
+  ],
+
+  "structuralFindings": [
+    {
+      "id": "no-naming-convention",
+      "name": "No consistent naming convention",
+      "domain": "Operations & Monitoring",
+      "severity": "Medium",
+      "trigger": {
+        "type": "naming_convention",
+        "patterns": ["SBZ-*", "SBZ-Win-*", "*-L1-*", "*-L2-*", "*-L3-*", "*-L4-*"],
+        "scope": "customer",
+        "threshold": 0.5
+      },
+      "detail": "Fewer than {percent}% of customer policies follow a recognizable naming convention. Without consistent naming, policy management, troubleshooting, and auditing become significantly harder as the environment grows.",
+      "recommendation": "Adopt a structured naming convention such as {Prefix}-{OS}-{Level}-{Domain}-{Name}-{Version} for all Intune policies. Rename existing policies to follow the chosen convention."
+    },
+    {
+      "id": "duplicate-policy-coverage",
+      "name": "Overlapping policy settings",
+      "domain": "Operations & Monitoring",
+      "severity": "Low",
+      "trigger": {
+        "type": "duplicate_coverage",
+        "threshold": 10
+      },
+      "detail": "{count} settings are configured in multiple customer policies with different values. This creates ambiguity about the effective configuration and may cause unexpected behavior depending on policy precedence.",
+      "recommendation": "Review overlapping policies and consolidate settings to avoid conflicts. Use Intune's policy conflict reporting to identify which policies are winning. Consider merging overlapping policies where possible."
+    }
+  ],
+
+  "inventoryFindings": [
+    {
+      "id": "devices-noncompliant",
+      "name": "Devices out of compliance",
+      "domain": "Compliance & Governance",
+      "severity": "High",
+      "trigger": {
+        "type": "inventory_metric",
+        "source": "devices",
+        "field": "ComplianceState",
+        "value": "noncompliant",
+        "operator": "percent_gte",
+        "threshold": 0.1
+      },
+      "detail": "{count} of {total} managed devices ({percent}%) are currently non-compliant. Non-compliant devices may not meet security requirements and, if Conditional Access is configured, could lose access to corporate resources.",
+      "recommendation": "Investigate non-compliant devices to identify root causes (outdated OS, missing encryption, failed health checks). Address systemic issues first, then target individual devices. Consider grace periods for new compliance policies."
+    },
+    {
+      "id": "no-autopilot",
+      "name": "No Autopilot enrollment",
+      "domain": "Operations & Monitoring",
+      "severity": "Medium",
+      "trigger": {
+        "type": "inventory_empty",
+        "source": "autopilotDevices"
+      },
+      "detail": "No Windows Autopilot device identities are registered. Without Autopilot, device provisioning is manual and inconsistent, increasing deployment time and the risk of misconfiguration.",
+      "recommendation": "Register devices in Windows Autopilot for zero-touch provisioning. Configure an Autopilot deployment profile with the appropriate user-driven or self-deploying mode. Import device hardware hashes from your OEM or existing fleet."
+    },
+    {
+      "id": "unassigned-apps",
+      "name": "Unassigned applications",
+      "domain": "Application Lifecycle",
+      "severity": "Low",
+      "trigger": {
+        "type": "inventory_metric",
+        "source": "apps",
+        "field": "IsAssigned",
+        "value": "No",
+        "operator": "percent_gte",
+        "threshold": 0.3
+      },
+      "detail": "{count} of {total} applications ({percent}%) in Intune have no assignments. Unassigned apps add management overhead without delivering value and may indicate incomplete deployment or orphaned configurations.",
+      "recommendation": "Review unassigned applications and either assign them to appropriate groups or remove them from Intune to reduce clutter. Establish an app lifecycle process for regular cleanup."
+    },
+    {
+      "id": "outdated-os",
+      "name": "Outdated OS versions",
+      "domain": "Device Management",
+      "severity": "Medium",
+      "trigger": {
+        "type": "inventory_metric",
+        "source": "devices",
+        "field": "OperatingSystem",
+        "value": "Windows 10",
+        "operator": "percent_gte",
+        "threshold": 0.1
+      },
+      "detail": "{count} of {total} devices ({percent}%) are running Windows 10 which is approaching or past end of support. Devices on unsupported OS versions no longer receive security updates.",
+      "recommendation": "Plan and execute a migration to Windows 11 for all eligible devices. Use Windows Autopilot and feature update policies to streamline the upgrade process. For ineligible hardware, plan device refresh cycles."
+    }
+  ]
+}

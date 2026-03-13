@@ -97,8 +97,9 @@ function Get-AutopilotDevices {
     $devices = $null
     try {
         $devices = Get-GraphPagedResults `
-            -Uri   "$BaseUrl/deviceManagement/windowsAutopilotDeviceIdentities" `
-            -Token $Token
+            -Uri        "$BaseUrl/deviceManagement/windowsAutopilotDeviceIdentities?`$top=25" `
+            -Token      $Token `
+            -TimeoutSec 300
     }
     catch {
         if ("$_" -match '403|Forbidden|Authorization_RequestDenied') {

@@ -109,7 +109,9 @@ function Get-GraphPagedResults {
         [string]$Uri,
 
         [Parameter(Mandatory)]
-        [string]$Token
+        [string]$Token,
+
+        [int]$TimeoutSec = 120
     )
 
     $results = [System.Collections.Generic.List[object]]::new()
@@ -119,7 +121,7 @@ function Get-GraphPagedResults {
     while ($nextUrl) {
         $page++
         Write-Verbose "  Paged fetch page ${page}: $nextUrl"
-        $response = Invoke-IbaGraphRequest -Uri $nextUrl -Token $Token
+        $response = Invoke-IbaGraphRequest -Uri $nextUrl -Token $Token -TimeoutSec $TimeoutSec
 
         if ($null -ne $response.value) {
             $results.AddRange([object[]]$response.value)
