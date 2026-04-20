@@ -28,8 +28,11 @@
     Defaults to Baseline\ next to this script.
 
 .PARAMETER BaselineLevel
-    Which baseline tier to assess against: L1, L2, L3, or L4.
-    Currently informational — used in filenames and summary output.
+    Which baseline tier to assess against: All, L1, L2, L3, or L4.
+    Defaults to All (no filtering — all baseline policies are compared).
+    Levels are cumulative: L2 includes L1+L2, L3 includes L1+L2+L3, etc.
+    Filtering is applied post-load, so the baseline cache always stores all
+    policies and you can switch levels without re-fetching.
 
 .PARAMETER UseBaselineCache
     Skip re-fetching the baseline tenant; use the cached baseline-cache.json.
@@ -56,7 +59,14 @@
         -CustomerName "Contoso"
 
 .EXAMPLE
-    # Only compare L1 baseline policies
+    # Assess against L2 baseline (cumulative: includes L1 + L2 policies)
+    .\IntuneBaselineAssessment.ps1 `
+        -CustomerTenantId "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" `
+        -CustomerName "Contoso" `
+        -BaselineLevel L2
+
+.EXAMPLE
+    # Only compare specific baseline policies (fetch-time filter)
     .\IntuneBaselineAssessment.ps1 `
         -CustomerTenantId "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" `
         -CustomerName "Contoso" `
@@ -83,8 +93,8 @@ param(
     [string]$OutputPath   = (Join-Path $PSScriptRoot 'Exports'),
     [string]$BaselinePath = (Join-Path $PSScriptRoot 'Baseline'),
 
-    [ValidateSet('L1', 'L2', 'L3', 'L4')]
-    [string]$BaselineLevel = 'L1',
+    [ValidateSet('All', 'L1', 'L2', 'L3', 'L4')]
+    [string]$BaselineLevel = 'All',
 
     [string[]]$BaselinePolicyFilter = @(),
 
@@ -110,7 +120,12 @@ Write-Host '║    Sprint 7 — +Findings Engine                       ║' -For
 Write-Host '╚══════════════════════════════════════════════════════╝' -ForegroundColor Cyan
 Write-Host "  Customer      : $CustomerName" -ForegroundColor White
 Write-Host "  Tenant ID     : $CustomerTenantId" -ForegroundColor White
-Write-Host "  Baseline Level: $BaselineLevel" -ForegroundColor White
+$levelDisplay = switch ($BaselineLevel) {
+    'All'   { 'All (L1-L4)' }
+    'L1'    { 'L1' }
+    default { "$BaselineLevel (cumulative: L1..$BaselineLevel)" }
+}
+Write-Host "  Baseline Level: $levelDisplay" -ForegroundColor White
 if ($BaselinePolicyFilter.Count -gt 0) {
     Write-Host "  Policy Filter : $($BaselinePolicyFilter -join ', ')" -ForegroundColor White
 }
@@ -211,6 +226,38 @@ function Get-AllPolicySettings {
     }
 
     return $all
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Private helper — filters baseline settings by level (cumulative)
+# ─────────────────────────────────────────────────────────────────────────────
+function Select-BaselineByLevel {
+    param(
+        [System.Collections.Generic.List[hashtable]]$Settings,
+        [string]$Level
+    )
+
+    if ($Level -eq 'All') { return $Settings }
+
+    # Cumulative: L2 includes L1+L2, L3 includes L1+L2+L3, etc.
+    $levelMap = @{
+        'L1' = @('L1')
+        'L2' = @('L1', 'L2')
+        'L3' = @('L1', 'L2', 'L3')
+        'L4' = @('L1', 'L2', 'L3', 'L4')
+    }
+    $included = $levelMap[$Level]
+
+    $filtered = [System.Collections.Generic.List[hashtable]]::new()
+    foreach ($s in $Settings) {
+        foreach ($lvl in $included) {
+            if ($s.PolicyName -like "*-$lvl-*") {
+                $filtered.Add($s)
+                break
+            }
+        }
+    }
+    return $filtered
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -338,6 +385,17 @@ if ($null -eq $baselineSettings) {
     }
     $cachePayload | ConvertTo-Json -Depth 10 | Set-Content $baselineCacheFile -Encoding UTF8
     Write-Host "  Baseline cached ($($baselineSettings.Count) settings): $baselineCacheFile" -ForegroundColor DarkGray
+}
+
+# ── Apply BaselineLevel filter (post-load) ──────────────────────────────────
+$preFilterCount = $baselineSettings.Count
+$baselineSettings = Select-BaselineByLevel -Settings $baselineSettings -Level $BaselineLevel
+
+if ($BaselineLevel -ne 'All') {
+    Write-Host "  Level filter ($BaselineLevel cumulative): $($baselineSettings.Count) of $preFilterCount settings." -ForegroundColor DarkGray
+}
+if ($baselineSettings.Count -eq 0) {
+    Write-Warning "No baseline settings match level '$BaselineLevel'. Check that baseline policies contain '-$BaselineLevel-' in their names."
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -484,7 +542,7 @@ $pExtra     = if ($total -gt 0) { $extra     / $total } else { 0 }
 Write-Host ''
 Write-Host '═══════════════════════════════════════════════════════' -ForegroundColor Cyan
 Write-Host "  Intune Baseline Assessment — $CustomerName"           -ForegroundColor Cyan
-Write-Host "  Baseline Level  : $BaselineLevel"                     -ForegroundColor Cyan
+Write-Host "  Baseline Level  : $levelDisplay"                      -ForegroundColor Cyan
 Write-Host "  Total Settings  : $total"                             -ForegroundColor Cyan
 Write-Host '───────────────────────────────────────────────────────' -ForegroundColor Cyan
 Write-Host ("  Compliant : {0,5}  ({1,5:P1})" -f $compliant, $pCompliant) -ForegroundColor Green
