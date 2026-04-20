@@ -370,7 +370,7 @@ function Invoke-InventoryMetricFinding {
     $field     = $trigger.field
     $value     = $trigger.value
     $operator  = $trigger.operator
-    $matchMode = if ($trigger.matchMode) { $trigger.matchMode } else { 'exact' }
+    $matchMode = if ($trigger.PSObject.Properties['matchMode']) { $trigger.matchMode } else { 'exact' }
     $threshold = [double]$trigger.threshold
 
     # Resolve the data collection
