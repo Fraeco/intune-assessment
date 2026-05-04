@@ -156,6 +156,20 @@ When you add a new SBZ baseline policy naming convention, add the prefix here; a
 ### FindingRules.json
 Sixteen rules across three arrays: `comparisonFindings`, `structuralFindings`, `inventoryFindings`. Every rule has at least `id`, `name`, `domain`, `severity`, `trigger`, `detail`, `recommendation`. The trigger's `type` field selects which evaluator runs; see the Recommendation Engine section below for details.
 
+### OSDefinition.json
+`Config/OSDefinition.json` is the resilient fallback mapping for OS lifecycle enrichment.
+
+Inventory OS lifecycle enrichment is implemented via `Modules/OsLifecycleProvider.psm1`:
+- Provider attempts Graph lifecycle source first (when enabled).
+- If Graph source is unavailable/incomplete, it falls back to `OSDefinition.json`.
+- Device rows are enriched additively with:
+  - `OsFamily`
+  - `OsRelease`
+  - `OsBuild`
+  - `OsSupportState`
+  - `OsEndOfServiceDate`
+  - `OsSource` (`graph` or `static`)
+
 ---
 
 ## 5. Running the tool
@@ -204,6 +218,8 @@ Full parameter table:
 | `RefreshBaseline` | switch | off | Force refetch even if cache exists |
 | `GenerateReportData` | switch | off | Write `ReportData.json` |
 | `SkipInventory` | switch | off | Skip device, enrollment, and app collection |
+| `PreferGraphOsLifecycle` | switch | on | Prefer Graph lifecycle source for OS enrichment |
+| `DisableGraphOsLifecycle` | switch | off | Force static `OSDefinition.json` mapping |
 | `PolicyTypes` | string[] | all six | Subset of policy types to compare |
 
 Note that `-BaselinePolicyFilter` and `-BaselineLevel` are independent and stackable: the first runs at fetch time and ships into the cache, the second runs after load and is free to change between runs.
@@ -245,6 +261,12 @@ Semicolon-delimited, all fields double-quoted, UTF-8 with BOM so Excel picks up 
 ### ReportData.json top-level keys
 
 `GeneratedAt`, `CustomerName`, `Consultant`, `BaselineLevel`, `Summary`, `ByDomain`, optionally `DeviceInventory`, `EnrollmentMethods`, `AppInventory`, `ExecutiveSummary`, `FindingSummary`, `FindingsByDomain`. Everything is an ordered hashtable serialised at depth 10.
+
+Within `DeviceInventory`, lifecycle enrichment now adds:
+- `ByOsSupportState`
+- `ByWindowsRelease`
+- `UnsupportedDeviceCount`
+- Device-level lifecycle fields in `Devices[]` rows
 
 ---
 

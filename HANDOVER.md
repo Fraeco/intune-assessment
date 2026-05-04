@@ -71,6 +71,7 @@ SBA-Maxim/
     AdminTemplateReader.psm1      <-- Admin Templates (ADMX) reader
     CompliancePolicyReader.psm1   <-- Compliance Policy reader
     SecurityBaselineReader.psm1   <-- Security Baselines reader
+    OsLifecycleProvider.psm1      <-- OS lifecycle resolver (Graph-first, static fallback)
     DeviceInventoryReader.psm1    <-- Managed device inventory
     EnrollmentAnalyzer.psm1       <-- Enrollment configs + Autopilot
     AppInventoryReader.psm1       <-- App inventory with assignments
@@ -83,6 +84,7 @@ SBA-Maxim/
     AppConfig.template.json       <-- Template to copy for AppConfig.json
     DomainMapping.json            <-- Rules for mapping settings to domains
     FindingRules.json             <-- Rules for generating findings
+    OSDefinition.json             <-- Fallback OS lifecycle mapping
   Baseline/
     baseline-cache.json           <-- Cached baseline data (generated)
   Exports/                        <-- Output files (generated)
@@ -525,6 +527,8 @@ The parameter block defines everything you can pass to the script:
 | `-RefreshBaseline` | No | Force a fresh fetch from the baseline tenant, even if a cache exists. |
 | `-GenerateReportData` | No | Also produce a `ReportData.json` with aggregated scores and findings. |
 | `-SkipInventory` | No | Skip device, enrollment, and app inventory collection. Useful for faster runs when you only need the policy comparison. |
+| `-PreferGraphOsLifecycle` | No | Prefer Graph lifecycle source for OS metadata and fall back to `OSDefinition.json` when needed. |
+| `-DisableGraphOsLifecycle` | No | Force static `OSDefinition.json` mapping and skip Graph lifecycle calls. |
 | `-PolicyTypes` | No | Which policy types to compare. Defaults to all six. Example: `-PolicyTypes SettingsCatalog,EndpointSecurity` |
 
 **Important relationship between `-BaselinePolicyFilter` and `-BaselineLevel`:**
@@ -539,7 +543,7 @@ After validating parameters, the script:
 
 1. **Sets strict mode and error preference** (line 110-111) — any error is fatal, any typo is caught.
 2. **Prints the banner** (lines 116-132) — shows version, customer name, tenant ID, and baseline level.
-3. **Imports all 15 modules** (lines 137-145) — loads them in a specific order from the `Modules/` folder. The `-Force` flag ensures fresh copies.
+3. **Imports all modules** (lines 137-145) — loads them in a specific order from the `Modules/` folder (including `OsLifecycleProvider.psm1`). The `-Force` flag ensures fresh copies.
 4. **Loads AppConfig.json** (lines 150-165) — reads the config file, converts it to a hashtable, and passes it to `Initialize-AuthConfig`.
 5. **Composes the Graph base URL** (line 168) — combines `GraphBaseUrl` and `GraphApiVersion` from the config (e.g., `https://graph.microsoft.com/beta`).
 6. **Loads DomainMapping.json** (lines 171-172) — initialises the enrichment module.
@@ -1029,7 +1033,15 @@ The JSON file contains everything needed to populate the Word report template:
             "Total": 580, "CompliantPct": 69, "MaturityScore": 3
         }
     },
-    "DeviceInventory": { "TotalDevices": 150, "ByOperatingSystem": [...], "..." : "..." },
+    "DeviceInventory": {
+        "TotalDevices": 150,
+        "ByOperatingSystem": [...],
+        "ByComplianceState": [...],
+        "ByOsSupportState": [...],
+        "ByWindowsRelease": [...],
+        "UnsupportedDeviceCount": 12,
+        "Devices": [ { "...": "...", "OsRelease": "Windows 11 23H2", "OsSupportState": "Supported", "OsSource": "graph|static" } ]
+    },
     "EnrollmentMethods": { "EnrollmentConfigCount": 5, "AutopilotDeviceCount": 120, "..." : "..." },
     "AppInventory": { "TotalApps": 45, "AssignedApps": 30, "..." : "..." },
     "ExecutiveSummary": {

@@ -384,14 +384,13 @@
       "trigger": {
         "type": "inventory_metric",
         "source": "devices",
-        "field": "OsVersion",
-        "value": "10.0.",
-        "matchMode": "startsWith",
+        "field": "OsSupportState",
+        "value": "Unsupported",
         "operator": "percent_gte",
         "threshold": 0.1
       },
-      "detail": "{count} van {total} apparaten ({percent}%) draaien Windows 10, dat het einde van de ondersteuning nadert of al voorbij is. Apparaten op niet-ondersteunde OS-versies ontvangen geen beveiligingsupdates meer.",
-      "recommendation": "Plan en voer een migratie naar Windows 11 uit voor alle geschikte apparaten. Gebruik Windows Autopilot en functie-updatebeleid om het upgradeproces te stroomlijnen. Plan voor niet-geschikte hardware vervanging van apparaten."
+      "detail": "{count} van {total} apparaten ({percent}%) draaien een niet-ondersteunde OS-versie. Apparaten op niet-ondersteunde releases ontvangen geen beveiligingsupdates meer.",
+      "recommendation": "Plan upgrades naar ondersteunde Windows-releases voor alle geschikte apparaten. Gebruik updatebeleid en Autopilot om de migratie te stroomlijnen en plan vervanging voor niet-geschikte hardware."
     }
   ]
 }

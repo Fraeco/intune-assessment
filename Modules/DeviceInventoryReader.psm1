@@ -28,7 +28,8 @@ function Get-DeviceInventory {
     [OutputType([System.Collections.Generic.List[hashtable]])]
     param(
         [Parameter(Mandatory)] [string]$Token,
-        [Parameter(Mandatory)] [string]$BaseUrl
+        [Parameter(Mandatory)] [string]$BaseUrl,
+        [switch]$IncludeOsLifecycleEnrichment
     )
 
     $selectFields = 'id,deviceName,operatingSystem,osVersion,complianceState,lastSyncDateTime,enrolledDateTime,managementAgent,deviceEnrollmentType,model,manufacturer,serialNumber,userPrincipalName'
@@ -52,7 +53,7 @@ function Get-DeviceInventory {
 
     $results = [System.Collections.Generic.List[hashtable]]::new()
     foreach ($d in $devices) {
-        $results.Add([ordered]@{
+        $row = [ordered]@{
             DeviceName        = $d.deviceName
             DeviceId          = $d.id
             OperatingSystem   = $d.operatingSystem
@@ -66,7 +67,27 @@ function Get-DeviceInventory {
             Manufacturer      = $d.manufacturer
             SerialNumber      = $d.serialNumber
             UserPrincipalName = $d.userPrincipalName
-        })
+        }
+
+        if ($IncludeOsLifecycleEnrichment) {
+            try {
+                $osMeta = Get-OsLifecycleInfo -OperatingSystem $d.operatingSystem -OsVersion $d.osVersion
+                foreach ($key in @('OsFamily', 'OsRelease', 'OsBuild', 'OsSupportState', 'OsEndOfServiceDate', 'OsSource')) {
+                    $row[$key] = $osMeta[$key]
+                }
+            }
+            catch {
+                # Keep inventory resilient; enrichment failure should not break collection.
+                $row['OsFamily'] = 'Unknown'
+                $row['OsRelease'] = 'Unknown'
+                $row['OsBuild'] = ''
+                $row['OsSupportState'] = 'Unknown'
+                $row['OsEndOfServiceDate'] = ''
+                $row['OsSource'] = 'none'
+            }
+        }
+
+        $results.Add($row)
     }
 
     return $results

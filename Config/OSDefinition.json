@@ -1,0 +1,48 @@
+{
+  "_comment": "Fallback OS lifecycle mapping used when Graph lifecycle endpoint is unavailable.",
+  "_source": "Maintained manually as resilient baseline mapping. BuildPrefix maps major Windows build train.",
+  "entries": [
+    {
+      "osFamily": "Windows",
+      "osRelease": "Windows 10 22H2",
+      "buildPrefix": "19045",
+      "supportState": "Unsupported",
+      "endOfServiceDate": "2025-10-14"
+    },
+    {
+      "osFamily": "Windows",
+      "osRelease": "Windows 10 21H2",
+      "buildPrefix": "19044",
+      "supportState": "Unsupported",
+      "endOfServiceDate": "2024-06-11"
+    },
+    {
+      "osFamily": "Windows",
+      "osRelease": "Windows 11 22H2",
+      "buildPrefix": "22621",
+      "supportState": "Supported",
+      "endOfServiceDate": "2025-10-14"
+    },
+    {
+      "osFamily": "Windows",
+      "osRelease": "Windows 11 23H2",
+      "buildPrefix": "22631",
+      "supportState": "Supported",
+      "endOfServiceDate": "2026-11-10"
+    },
+    {
+      "osFamily": "Windows",
+      "osRelease": "Windows 11 24H2",
+      "buildPrefix": "26100",
+      "supportState": "Supported",
+      "endOfServiceDate": "2027-10-12"
+    },
+    {
+      "osFamily": "Windows",
+      "osRelease": "Windows 11 25H2",
+      "buildPrefix": "26200",
+      "supportState": "Supported",
+      "endOfServiceDate": "2028-10-10"
+    }
+  ]
+}

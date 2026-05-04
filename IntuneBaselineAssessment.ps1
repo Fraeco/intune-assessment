@@ -62,6 +62,13 @@
 .PARAMETER GenerateReportData
     Also write a ReportData.json with aggregated scores for report population.
 
+.PARAMETER PreferGraphOsLifecycle
+    Prefer Microsoft Graph Windows lifecycle metadata for OS enrichment.
+    Falls back to Config\OSDefinition.json when unavailable.
+
+.PARAMETER DisableGraphOsLifecycle
+    Disables Graph lifecycle lookups and forces static OSDefinition.json mapping.
+
 .EXAMPLE
     .\IntuneBaselineAssessment.ps1 `
         -CustomerTenantId "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" `
@@ -113,6 +120,8 @@ param(
     [switch]$RefreshDefinitions,
     [switch]$GenerateReportData,
     [switch]$SkipInventory,
+    [switch]$PreferGraphOsLifecycle = $true,
+    [switch]$DisableGraphOsLifecycle,
 
     [ValidateSet('SettingsCatalog', 'EndpointSecurity', 'DeviceConfig', 'AdminTemplates', 'CompliancePolicy', 'SecurityBaseline')]
     [string[]]$PolicyTypes = @('SettingsCatalog', 'EndpointSecurity', 'DeviceConfig', 'AdminTemplates', 'CompliancePolicy', 'SecurityBaseline')
@@ -147,7 +156,7 @@ Write-Host ''
 # ─────────────────────────────────────────────────────────────────────────────
 $moduleRoot = Join-Path $PSScriptRoot 'Modules'
 
-foreach ($moduleName in @('Auth', 'GraphAPI', 'DefinitionCache', 'PolicyReader', 'EndpointSecurityReader', 'DeviceConfigReader', 'AdminTemplateReader', 'CompliancePolicyReader', 'SecurityBaselineReader', 'DeviceInventoryReader', 'EnrollmentAnalyzer', 'AppInventoryReader', 'Comparison', 'Enrichment', 'RecommendationEngine', 'Export')) {
+foreach ($moduleName in @('Auth', 'GraphAPI', 'DefinitionCache', 'PolicyReader', 'EndpointSecurityReader', 'DeviceConfigReader', 'AdminTemplateReader', 'CompliancePolicyReader', 'SecurityBaselineReader', 'OsLifecycleProvider', 'DeviceInventoryReader', 'EnrollmentAnalyzer', 'AppInventoryReader', 'Comparison', 'Enrichment', 'RecommendationEngine', 'Export')) {
     $modulePath = Join-Path $moduleRoot "$moduleName.psm1"
     if (-not (Test-Path $modulePath)) {
         throw "Required module not found: $modulePath"
@@ -466,7 +475,15 @@ if (-not $SkipInventory) {
     Write-Host ''
     Write-Host '[3/5] Customer tenant — inventory collection' -ForegroundColor Yellow
 
-    $deviceInventory = Get-DeviceInventory -Token $customerToken -BaseUrl $baseUrl
+    $osDefinitionPath = Join-Path $ConfigPath 'OSDefinition.json'
+    Initialize-OsLifecycleProvider `
+        -Token $customerToken `
+        -BaseUrl $baseUrl `
+        -OsDefinitionPath $osDefinitionPath `
+        -PreferGraph:$PreferGraphOsLifecycle `
+        -DisableGraph:$DisableGraphOsLifecycle
+
+    $deviceInventory = Get-DeviceInventory -Token $customerToken -BaseUrl $baseUrl -IncludeOsLifecycleEnrichment
     $enrollmentData  = Get-EnrollmentAnalysis -Token $customerToken -BaseUrl $baseUrl
     $appInventory    = Get-AppInventory -Token $customerToken -BaseUrl $baseUrl
 

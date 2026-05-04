@@ -11,7 +11,7 @@ population.
 
 - Baseline vs customer comparison with Compliant / Conflict / Missing / Extra results
 - 6 policy types: Settings Catalog, Endpoint Security, Device Configuration, Admin Templates, Compliance Policies, Security Baselines
-- Device inventory — managed devices with compliance state and OS version
+- Device inventory — managed devices with compliance state, OS version, and lifecycle enrichment
 - Enrollment analysis — enrollment configurations and Autopilot device identities
 - Application inventory — mobile apps with assignment intent and group targeting
 - Domain enrichment across 5 assessment domains via `Config/DomainMapping.json`
@@ -116,6 +116,8 @@ Filter baseline policies and force cache refresh:
 | `RefreshDefinitions` | switch | Force refresh of the definitions cache |
 | `GenerateReportData` | switch | Write `ReportData.json` with aggregated scores and inventory |
 | `SkipInventory` | switch | Skip device/enrollment/app inventory collection |
+| `PreferGraphOsLifecycle` | switch | Prefer Graph lifecycle source for OS metadata, with static fallback |
+| `DisableGraphOsLifecycle` | switch | Disable Graph lifecycle lookup and force static `Config\OSDefinition.json` |
 | `PolicyTypes` | string[] | Subset of policy types to compare (default: all 6) |
 
 `PolicyTypes` values: `SettingsCatalog`, `EndpointSecurity`, `DeviceConfig`, `AdminTemplates`, `CompliancePolicy`, `SecurityBaseline`
@@ -151,12 +153,14 @@ Modules\
   DeviceInventoryReader.psm1   — Managed device inventory
   EnrollmentAnalyzer.psm1      — Enrollment configs + Autopilot devices
   AppInventoryReader.psm1      — App inventory with assignment data
+  OsLifecycleProvider.psm1     — OS lifecycle resolver (Graph-first, static fallback)
   Comparison.psm1              — Diff engine (Compliant/Conflict/Missing/Extra)
   Enrichment.psm1              — Domain enrichment via DomainMapping.json
   Export.psm1                  — CSV and JSON output generation
 Config\
   AppConfig.template.json      — Config template (copy to AppConfig.json)
   DomainMapping.json           — Domain enrichment rules
+  OSDefinition.json            — OS lifecycle fallback mapping
 Baseline\                      — Baseline cache (generated, not committed)
 Exports\                       — Output files (generated, not committed)
 ```
@@ -168,3 +172,4 @@ Exports\                       — Output files (generated, not committed)
 - Baseline policy filters are baked into the cache; use `-RefreshBaseline` if filters change.
 - Baseline auth token acquisition in `Auth.psm1` uses a 60-second timeout to avoid indefinite hangs when Entra connectivity is degraded.
 - New Graph API permissions (`DeviceManagementServiceConfig.Read.All`, `DeviceManagementApps.Read.All`) must be granted by the customer admin before inventory collection will succeed. Missing permissions produce a warning and an empty inventory, not a fatal error.
+- OS lifecycle enrichment is additive and backward compatible: existing inventory fields remain unchanged, while `OsFamily`, `OsRelease`, `OsBuild`, `OsSupportState`, `OsEndOfServiceDate`, and `OsSource` are appended.

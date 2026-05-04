@@ -28,6 +28,26 @@ $script:CsvColumns = @(
 
 $script:CsvHeader = '"Baseline Policy Name";"Baseline Policy Template";"Baseline Setting";"Baseline Category";"Baseline Domain";"Baseline Setting Value";"Result";"Policy Name";"Customer Setting";"Policy Template";"Policy Value";"Comparison Category";"Comparison Domain";"Description"'
 
+function Get-InventoryValue {
+    param(
+        [object]$Item,
+        [string]$Field
+    )
+
+    if ($Item -is [hashtable]) {
+        if ($Item.ContainsKey($Field) -and $null -ne $Item[$Field] -and "$($Item[$Field])".Trim().Length -gt 0) {
+            return "$($Item[$Field])"
+        }
+    }
+    elseif ($Item -and $Item.PSObject.Properties[$Field]) {
+        $value = $Item.$Field
+        if ($null -ne $value -and "$value".Trim().Length -gt 0) {
+            return "$value"
+        }
+    }
+    return 'Unknown'
+}
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -302,15 +322,25 @@ function Export-ReportData {
 
     # Inventory sections (optional — only present when data was collected)
     if ($null -ne $DeviceInventory) {
-        $osSummary = @($DeviceInventory | Group-Object OperatingSystem |
+        $osSummary = @($DeviceInventory | Group-Object { Get-InventoryValue -Item $_ -Field 'OperatingSystem' } |
             ForEach-Object { [ordered]@{ OS = $_.Name; Count = $_.Count } })
-        $complianceSummary = @($DeviceInventory | Group-Object ComplianceState |
+        $complianceSummary = @($DeviceInventory | Group-Object { Get-InventoryValue -Item $_ -Field 'ComplianceState' } |
             ForEach-Object { [ordered]@{ State = $_.Name; Count = $_.Count } })
+        $supportStateSummary = @($DeviceInventory | Group-Object { Get-InventoryValue -Item $_ -Field 'OsSupportState' } |
+            ForEach-Object { [ordered]@{ SupportState = $_.Name; Count = $_.Count } })
+        $releaseSummary = @($DeviceInventory | Group-Object { Get-InventoryValue -Item $_ -Field 'OsRelease' } |
+            ForEach-Object { [ordered]@{ Release = $_.Name; Count = $_.Count } })
+        $unsupportedDeviceCount = @($DeviceInventory | Where-Object {
+            (Get-InventoryValue -Item $_ -Field 'OsSupportState') -eq 'Unsupported'
+        }).Count
 
         $reportData['DeviceInventory'] = [ordered]@{
             TotalDevices      = $DeviceInventory.Count
             ByOperatingSystem = $osSummary
             ByComplianceState = $complianceSummary
+            ByOsSupportState  = $supportStateSummary
+            ByWindowsRelease  = $releaseSummary
+            UnsupportedDeviceCount = $unsupportedDeviceCount
             Devices           = @($DeviceInventory)
         }
     }

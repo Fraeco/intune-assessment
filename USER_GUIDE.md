@@ -169,6 +169,8 @@ Valid values: `SettingsCatalog`, `EndpointSecurity`, `DeviceConfig`,
 | `-RefreshDefinitions` |   | Force fresh definition prefetch and overwrite definitions cache |
 | `-SkipInventory` |   | Skip device/enrollment/app inventory collection |
 | `-GenerateReportData` |   | Also write `ReportData.json` |
+| `-PreferGraphOsLifecycle` |   | Prefer Graph OS lifecycle source; falls back to static mapping automatically |
+| `-DisableGraphOsLifecycle` |   | Force static `Config\OSDefinition.json` and skip Graph lifecycle calls |
 | `-ConfigPath` |   | Location of `AppConfig.json` and `DomainMapping.json` (default: `Config\`) |
 | `-OutputPath` |   | Where CSVs go (default: `Exports\`) |
 | `-BaselinePath` |   | Where the baseline cache lives (default: `Baseline\`) |
@@ -231,6 +233,11 @@ Columns: Device Name, Device ID, Operating System, OS Version, Compliance
 State, Last Sync, Enrolled Date, Management Agent, Enrollment Type, Model,
 Manufacturer, Serial Number, User Principal Name.
 
+The inventory pipeline also enriches devices internally with lifecycle metadata
+(`OsFamily`, `OsRelease`, `OsBuild`, `OsSupportState`, `OsEndOfServiceDate`,
+`OsSource`). These fields are included in `ReportData.json` under
+`DeviceInventory.Devices`.
+
 Useful filters in Excel:
 - `Compliance State = noncompliant` → devices failing compliance policies
 - `Last Sync` older than ~30 days → stale / orphaned enrolments
@@ -265,7 +272,7 @@ Word report template reads. Top-level shape:
 CustomerName, BaselineLevel, GeneratedAt
 Summary           — totals and per-result counts
 ByDomain          — per-domain compliance % and maturity score (0–5)
-DeviceInventory   — totals + breakdown by OS and compliance state
+DeviceInventory   — totals + breakdown by OS, compliance state, support state, and release
 EnrollmentMethods — enrollment configs + Autopilot devices
 AppInventory      — totals + breakdown by assignment state and app type
 ExecutiveSummary  — top 3 findings (name, severity, detail, recommendation)
@@ -275,6 +282,11 @@ FindingsByDomain  — grouped findings, full recommendations
 
 You generally don't read this file by hand — it exists so the report template
 can populate itself.
+
+The `DeviceInventory` block now also includes:
+- `ByOsSupportState` (Supported/Unsupported/Unknown counts)
+- `ByWindowsRelease` (release label counts, e.g. Windows 11 23H2)
+- `UnsupportedDeviceCount`
 
 ### 5.5 The console summary
 
