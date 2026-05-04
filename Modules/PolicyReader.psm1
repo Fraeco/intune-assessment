@@ -19,7 +19,10 @@
 Set-StrictMode -Version Latest
 
 # ---------------------------------------------------------------------------
-# In-memory caches (survive the life of the PowerShell session)
+# Local fallback caches — used when DefinitionCache.psm1 has not been
+# initialised, or for definitions/categories not present in the global catalog
+# (e.g. tenant-specific or deprecated). Otherwise lookups go through the
+# shared cache via Get-CachedSettingDefinition / Get-CachedSettingCategory.
 # ---------------------------------------------------------------------------
 $script:DefinitionCache = [System.Collections.Generic.Dictionary[string, object]]::new()
 $script:CategoryCache   = [System.Collections.Generic.Dictionary[string, object]]::new()
@@ -126,13 +129,19 @@ function Get-PolicySettings {
            '?$expand=settingDefinitions'
     $settings = Get-GraphPagedResults -Uri $url -Token $Token
 
-    # Pre-populate the definition cache from inline definitions
+    # Push inline definitions into both caches — local fallback for resolution
+    # within this module, and the shared cache so other readers benefit too.
+    $shared = Test-DefinitionCacheReady
     foreach ($setting in $settings) {
         if ($null -ne $setting.settingDefinitions) {
             foreach ($def in $setting.settingDefinitions) {
                 $defId = $def.id
-                if ($defId -and -not $script:DefinitionCache.ContainsKey($defId)) {
+                if (-not $defId) { continue }
+                if (-not $script:DefinitionCache.ContainsKey($defId)) {
                     $script:DefinitionCache[$defId] = $def
+                }
+                if ($shared) {
+                    Add-CachedDefinition -Kind 'SettingsCatalog' -Id $defId -Definition $def
                 }
             }
         }
@@ -276,15 +285,26 @@ function Get-SettingDefinition {
         [string]$BaseUrl
     )
 
+    # Shared cache first — eliminates per-ID Graph requests when initialised
+    if (Test-DefinitionCacheReady) {
+        $shared = Get-CachedSettingDefinition -DefinitionId $DefinitionId
+        if ($null -ne $shared) { return $shared }
+    }
+
+    # Local fallback (populated from $expand=settingDefinitions on policy fetch)
     if ($script:DefinitionCache.ContainsKey($DefinitionId)) {
         return $script:DefinitionCache[$DefinitionId]
     }
 
+    # Last resort: per-ID API call (deprecated/custom definitions)
     try {
         $encoded = [Uri]::EscapeDataString($DefinitionId)
         $url     = "$BaseUrl/deviceManagement/configurationSettings/$encoded"
         $def     = Invoke-IbaGraphRequest -Uri $url -Token $Token
         $script:DefinitionCache[$DefinitionId] = $def
+        if ($null -ne $def -and (Test-DefinitionCacheReady)) {
+            Add-CachedDefinition -Kind 'SettingsCatalog' -Id $DefinitionId -Definition $def
+        }
         return $def
     }
     catch {
@@ -303,6 +323,8 @@ function Get-CategoryPath {
     Walks up the category parent chain and returns a display path like
     "Administrative Templates > Windows Components > BitLocker Drive Encryption".
     Root categories (parentCategoryId = $null) are excluded from the path.
+    Delegates to the shared cache when available (no API calls); otherwise
+    walks the chain via Get-CategoryInfo (which still hits the local cache).
     #>
     param(
         [string]$CategoryId,
@@ -314,6 +336,12 @@ function Get-CategoryPath {
 
     if ([string]::IsNullOrWhiteSpace($CategoryId) -or $Depth -ge $MaxDepth) {
         return ''
+    }
+
+    if ($Depth -eq 0 -and (Test-DefinitionCacheReady)) {
+        $shared = Get-CachedCategoryPath -CategoryId $CategoryId -MaxDepth $MaxDepth
+        if ($shared) { return $shared }
+        # Fall through if shared cache returned empty (category not pre-loaded)
     }
 
     $cat = Get-CategoryInfo -CategoryId $CategoryId -Token $Token -BaseUrl $BaseUrl
@@ -345,14 +373,25 @@ function Get-CategoryInfo {
         [string]$BaseUrl
     )
 
+    # Shared cache first
+    if (Test-DefinitionCacheReady) {
+        $shared = Get-CachedSettingCategory -CategoryId $CategoryId
+        if ($null -ne $shared) { return $shared }
+    }
+
+    # Local fallback
     if ($script:CategoryCache.ContainsKey($CategoryId)) {
         return $script:CategoryCache[$CategoryId]
     }
 
+    # Last resort: per-ID API call
     try {
         $url = "$BaseUrl/deviceManagement/configurationCategories/$CategoryId"
         $cat = Invoke-IbaGraphRequest -Uri $url -Token $Token
         $script:CategoryCache[$CategoryId] = $cat
+        if ($null -ne $cat -and (Test-DefinitionCacheReady)) {
+            Add-CachedDefinition -Kind 'Category' -Id $CategoryId -Definition $cat
+        }
         return $cat
     }
     catch {

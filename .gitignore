@@ -5,6 +5,7 @@ Config/AppConfig.json
 # ── Generated output ────────────────────────────────────────────────────────
 exports/
 Baseline/baseline-cache.json
+Baseline/definitions-cache.json
 
 # ── OS / editor artefacts ───────────────────────────────────────────────────
 Thumbs.db
@@ -22,3 +23,5 @@ desktop.ini
 .vscode/
 
 informational/
+
+Robin/

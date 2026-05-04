@@ -25,7 +25,8 @@
 Set-StrictMode -Version Latest
 
 # ---------------------------------------------------------------------------
-# In-memory cache
+# Local fallback cache — used when DefinitionCache.psm1 has not been
+# initialised, or for ADMX definitions not present in the global catalog.
 # ---------------------------------------------------------------------------
 $script:AdmxDefinitionCache = [System.Collections.Generic.Dictionary[string, object]]::new()
 
@@ -80,15 +81,20 @@ function Get-AdminTemplatePolicies {
 
         $defValues = Get-AdmxDefinitionValues -PolicyId $policy.id -Token $Token -BaseUrl $BaseUrl
 
+        $shared = Test-DefinitionCacheReady
         foreach ($dv in $defValues) {
             # Get definition — prefer embedded expand, fall back to cache/API
             $def = $null
             if ($dv.PSObject.Properties['definition'] -and $dv.definition) {
                 $def = $dv.definition
-                # Populate the cache while we have it
-                if ($def.PSObject.Properties['id'] -and $def.id -and
-                    -not $script:AdmxDefinitionCache.ContainsKey($def.id)) {
-                    $script:AdmxDefinitionCache[$def.id] = $def
+                # Populate both caches while we have the inline definition
+                if ($def.PSObject.Properties['id'] -and $def.id) {
+                    if (-not $script:AdmxDefinitionCache.ContainsKey($def.id)) {
+                        $script:AdmxDefinitionCache[$def.id] = $def
+                    }
+                    if ($shared) {
+                        Add-CachedDefinition -Kind 'Admx' -Id $def.id -Definition $def
+                    }
                 }
             }
             elseif ($dv.PSObject.Properties['definitionId'] -and $dv.definitionId) {
@@ -177,15 +183,26 @@ function Get-AdmxDefinitionValues {
 function Get-AdmxDefinition {
     param([string]$DefinitionId, [string]$Token, [string]$BaseUrl)
 
+    # Shared cache first — eliminates per-ID Graph requests when initialised
+    if (Test-DefinitionCacheReady) {
+        $shared = Get-CachedAdmxDefinition -DefinitionId $DefinitionId
+        if ($null -ne $shared) { return $shared }
+    }
+
+    # Local fallback
     if ($script:AdmxDefinitionCache.ContainsKey($DefinitionId)) {
         return $script:AdmxDefinitionCache[$DefinitionId]
     }
 
+    # Last resort: per-ID API call
     try {
         $def = Invoke-IbaGraphRequest `
             -Uri   "$BaseUrl/deviceManagement/groupPolicyDefinitions/$DefinitionId" `
             -Token $Token
         $script:AdmxDefinitionCache[$DefinitionId] = $def
+        if ($null -ne $def -and (Test-DefinitionCacheReady)) {
+            Add-CachedDefinition -Kind 'Admx' -Id $DefinitionId -Definition $def
+        }
         return $def
     }
     catch {

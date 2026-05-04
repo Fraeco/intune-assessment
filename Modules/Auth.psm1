@@ -127,13 +127,14 @@ function Get-GraphToken {
     }
 
     Write-Verbose "Acquiring token from: $tokenUrl"
-
+    $tokenTimeoutSec = 60
     try {
         $response = Invoke-RestMethod `
             -Uri         $tokenUrl `
             -Method      Post `
             -Body        $body `
             -ContentType 'application/x-www-form-urlencoded' `
+            -TimeoutSec  $tokenTimeoutSec `
             -ErrorAction Stop
 
         $script:TokenCache[$TenantId] = @{

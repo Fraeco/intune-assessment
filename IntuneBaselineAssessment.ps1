@@ -50,6 +50,15 @@
     Note: the filter is baked into the baseline cache. If you change the filter,
     use -RefreshBaseline to re-fetch.
 
+.PARAMETER UseDefinitionsCache
+    Persist the bulk-fetched setting definition / category catalog to
+    Baseline\definitions-cache.json so subsequent runs can skip the bulk fetch.
+    Without this switch the cache is fetched into memory only (Azure Function
+    App default).
+
+.PARAMETER RefreshDefinitions
+    Force a fresh bulk fetch of definitions and overwrite the cache file.
+
 .PARAMETER GenerateReportData
     Also write a ReportData.json with aggregated scores for report population.
 
@@ -100,6 +109,8 @@ param(
 
     [switch]$UseBaselineCache,
     [switch]$RefreshBaseline,
+    [switch]$UseDefinitionsCache,
+    [switch]$RefreshDefinitions,
     [switch]$GenerateReportData,
     [switch]$SkipInventory,
 
@@ -115,8 +126,8 @@ $ErrorActionPreference = 'Stop'
 # ─────────────────────────────────────────────────────────────────────────────
 Write-Host ''
 Write-Host '╔══════════════════════════════════════════════════════╗' -ForegroundColor Cyan
-Write-Host '║    Intune Baseline Assessment Tool  v0.7.0           ║' -ForegroundColor Cyan
-Write-Host '║    Sprint 7 — +Findings Engine                       ║' -ForegroundColor Cyan
+Write-Host '║    Intune Baseline Assessment Tool  v0.8.0           ║' -ForegroundColor Cyan
+Write-Host '║    +Bulk Definition Pre-Fetch                        ║' -ForegroundColor Cyan
 Write-Host '╚══════════════════════════════════════════════════════╝' -ForegroundColor Cyan
 Write-Host "  Customer      : $CustomerName" -ForegroundColor White
 Write-Host "  Tenant ID     : $CustomerTenantId" -ForegroundColor White
@@ -136,7 +147,7 @@ Write-Host ''
 # ─────────────────────────────────────────────────────────────────────────────
 $moduleRoot = Join-Path $PSScriptRoot 'Modules'
 
-foreach ($moduleName in @('Auth', 'GraphAPI', 'PolicyReader', 'EndpointSecurityReader', 'DeviceConfigReader', 'AdminTemplateReader', 'CompliancePolicyReader', 'SecurityBaselineReader', 'DeviceInventoryReader', 'EnrollmentAnalyzer', 'AppInventoryReader', 'Comparison', 'Enrichment', 'RecommendationEngine', 'Export')) {
+foreach ($moduleName in @('Auth', 'GraphAPI', 'DefinitionCache', 'PolicyReader', 'EndpointSecurityReader', 'DeviceConfigReader', 'AdminTemplateReader', 'CompliancePolicyReader', 'SecurityBaselineReader', 'DeviceInventoryReader', 'EnrollmentAnalyzer', 'AppInventoryReader', 'Comparison', 'Enrichment', 'RecommendationEngine', 'Export')) {
     $modulePath = Join-Path $moduleRoot "$moduleName.psm1"
     if (-not (Test-Path $modulePath)) {
         throw "Required module not found: $modulePath"
@@ -261,8 +272,40 @@ function Select-BaselineByLevel {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Step 0 — Initialise the shared definition cache
+#
+# Bulk-fetches Settings Catalog definitions + categories + ADMX definitions
+# from the baseline tenant once, so all readers can resolve them via O(1)
+# lookups instead of per-ID Graph requests.
+# ─────────────────────────────────────────────────────────────────────────────
+Write-Host '[0/5] Initialising definition cache' -ForegroundColor Yellow
+
+$defCacheFile = if ($UseDefinitionsCache) { Join-Path $BaselinePath 'definitions-cache.json' } else { $null }
+$baselineToken = $null
+
+# Acquire the baseline token now unless we're confident a fresh cache file exists.
+# When required, the token is reused by Step 1's baseline fetch path.
+$canSkipBaselineConnect = $UseDefinitionsCache -and -not $RefreshDefinitions -and $defCacheFile -and (Test-Path $defCacheFile)
+if (-not $canSkipBaselineConnect) {
+    $baselineToken = Connect-BaselineTenant
+}
+
+Initialize-DefinitionCache `
+    -Token         $baselineToken `
+    -BaseUrl       $baseUrl `
+    -CacheFile     $defCacheFile `
+    -ForceRefresh:$RefreshDefinitions `
+    -SourceTenantId $configHash['BaselineTenantId']
+
+$cacheStats = Get-DefinitionCacheStats
+Write-Host ("  Ready ({0}): {1} SC defs, {2} categories, {3} ADMX defs." -f `
+    $cacheStats.Source, $cacheStats.SettingsCatalogDefinitions, `
+    $cacheStats.SettingsCatalogCategories, $cacheStats.AdmxDefinitions) -ForegroundColor Green
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Step 1 — Baseline settings (all policy types)
 # ─────────────────────────────────────────────────────────────────────────────
+Write-Host ''
 Write-Host '[1/5] Baseline tenant — all policy types' -ForegroundColor Yellow
 
 $baselineCacheFile = Join-Path $BaselinePath 'baseline-cache.json'
@@ -354,7 +397,7 @@ if ($null -eq $baselineSettings) {
         Write-Warning "  --UseBaselineCache specified but no cache found; fetching from baseline tenant."
     }
 
-    $baselineToken    = Connect-BaselineTenant
+    if ($null -eq $baselineToken) { $baselineToken = Connect-BaselineTenant }
     $baselineSettings = Get-AllPolicySettings `
         -Token        $baselineToken `
         -BaseUrl      $baseUrl `

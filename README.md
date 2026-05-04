@@ -108,10 +108,12 @@ Filter baseline policies and force cache refresh:
 |---|---|---|
 | `CustomerTenantId` | string (required) | Customer Azure AD tenant ID (GUID) |
 | `CustomerName` | string (required) | Used in output filenames |
-| `BaselineLevel` | L1/L2/L3/L4 | Baseline tier label (default: L1) |
+| `BaselineLevel` | All/L1/L2/L3/L4 | Baseline tier label (default: All) |
 | `BaselinePolicyFilter` | string[] | Wildcard patterns for baseline policy names |
 | `UseBaselineCache` | switch | Use `Baseline\baseline-cache.json` instead of refetching |
 | `RefreshBaseline` | switch | Force baseline re-fetch and overwrite cache |
+| `UseDefinitionsCache` | switch | Persist/reuse `Baseline\definitions-cache.json` for definition prefetch |
+| `RefreshDefinitions` | switch | Force refresh of the definitions cache |
 | `GenerateReportData` | switch | Write `ReportData.json` with aggregated scores and inventory |
 | `SkipInventory` | switch | Skip device/enrollment/app inventory collection |
 | `PolicyTypes` | string[] | Subset of policy types to compare (default: all 6) |
@@ -164,4 +166,5 @@ Exports\                       — Output files (generated, not committed)
 - Uses Microsoft Graph API (`beta` endpoint) with the OAuth2 client credentials flow.
 - Domain mapping in `Config\DomainMapping.json` drives report categorization across 5 assessment domains: Endpoint Security, Device Management, Compliance & Governance, Application Lifecycle, Operations & Monitoring.
 - Baseline policy filters are baked into the cache; use `-RefreshBaseline` if filters change.
+- Baseline auth token acquisition in `Auth.psm1` uses a 60-second timeout to avoid indefinite hangs when Entra connectivity is degraded.
 - New Graph API permissions (`DeviceManagementServiceConfig.Read.All`, `DeviceManagementApps.Read.All`) must be granted by the customer admin before inventory collection will succeed. Missing permissions produce a warning and an empty inventory, not a fatal error.

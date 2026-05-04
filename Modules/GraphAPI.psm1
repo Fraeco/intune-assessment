@@ -59,13 +59,26 @@ function Invoke-IbaGraphRequest {
             return $response
         }
         catch {
-            $statusCode = [int]$_.Exception.Response.StatusCode
+            # Safely extract status code — non-HTTP exceptions (timeouts,
+            # network failures, MSAL errors) don't have a Response property,
+            # and Set-StrictMode would otherwise mask the real error here.
+            $response   = $null
+            $statusCode = 0
+            if ($_.Exception -and $_.Exception.PSObject.Properties['Response']) {
+                $response = $_.Exception.Response
+                if ($response -and $response.PSObject.Properties['StatusCode']) {
+                    try { $statusCode = [int]$response.StatusCode } catch { $statusCode = 0 }
+                }
+            }
 
             if ($statusCode -eq 429) {
                 # Respect Retry-After header; default 30 s if absent
                 $retryAfter = 30
-                $raHeader   = $_.Exception.Response.Headers['Retry-After']
-                if ($raHeader) { $retryAfter = [int]$raHeader }
+                if ($response -and $response.PSObject.Properties['Headers'] -and $response.Headers) {
+                    $raHeader = $null
+                    try { $raHeader = $response.Headers['Retry-After'] } catch { }
+                    if ($raHeader) { $retryAfter = [int]$raHeader }
+                }
 
                 Write-Warning "Graph API throttled (429). Waiting $retryAfter s before retry $($attempt + 1)/$MaxRetries..."
                 Start-Sleep -Seconds $retryAfter
@@ -78,12 +91,14 @@ function Invoke-IbaGraphRequest {
                 $attempt++
             }
             else {
-                $detail = if ($_.ErrorDetails.Message) {
-                    try { ($_.ErrorDetails.Message | ConvertFrom-Json).error.message } catch { $_.ErrorDetails.Message }
-                } else {
-                    $_.Exception.Message
+                $detail = $null
+                if ($_.ErrorDetails -and $_.ErrorDetails.Message) {
+                    try   { $detail = ($_.ErrorDetails.Message | ConvertFrom-Json).error.message }
+                    catch { $detail = $_.ErrorDetails.Message }
                 }
-                throw "Graph API [$statusCode] $Uri — $detail"
+                if (-not $detail) { $detail = $_.Exception.Message }
+                $statusLabel = if ($statusCode -gt 0) { "[$statusCode]" } else { "[no-status]" }
+                throw "Graph API $statusLabel $Uri — $detail"
             }
         }
     }

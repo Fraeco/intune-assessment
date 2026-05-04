@@ -112,6 +112,18 @@ Use `-UseBaselineCache` to skip the baseline fetch on subsequent runs:
 The baseline cache only changes when eVri updates the hardened baseline. Use
 `-RefreshBaseline` to force a fresh fetch.
 
+For Robin Phase 1 definition prefetch, you can persist and reuse the definition
+catalog cache as well:
+
+```powershell
+.\IntuneBaselineAssessment.ps1 `
+    -CustomerTenantId "<GUID>" -CustomerName "Contoso" `
+    -UseDefinitionsCache
+```
+
+This creates/reuses `Baseline\definitions-cache.json` and reduces startup
+latency on repeated runs.
+
 ### 4.3 Common scenarios
 
 **Assess against a specific maturity tier** — baseline policies are labelled
@@ -153,6 +165,8 @@ Valid values: `SettingsCatalog`, `EndpointSecurity`, `DeviceConfig`,
 | `-BaselinePolicyFilter` |   | Wildcard patterns; narrows which baseline policies are fetched |
 | `-UseBaselineCache` |   | Skip baseline fetch; use the on-disk cache |
 | `-RefreshBaseline` |   | Force a fresh baseline fetch |
+| `-UseDefinitionsCache` |   | Persist/reuse `Baseline\definitions-cache.json` |
+| `-RefreshDefinitions` |   | Force fresh definition prefetch and overwrite definitions cache |
 | `-SkipInventory` |   | Skip device/enrollment/app inventory collection |
 | `-GenerateReportData` |   | Also write `ReportData.json` |
 | `-ConfigPath` |   | Location of `AppConfig.json` and `DomainMapping.json` (default: `Config\`) |
@@ -360,6 +374,12 @@ You haven't created `Config\AppConfig.json` yet. See §3.
 The customer hasn't granted admin consent, or the app registration is missing
 a permission. Re-check §2 and have the customer admin grant consent in the
 Azure portal under *Enterprise applications → {eVri app} → Permissions*.
+
+### Baseline tenant connect is slow or times out
+
+Token acquisition now uses a 60-second timeout to avoid indefinite hanging.
+If this still fails, validate outbound/proxy access to
+`https://login.microsoftonline.com` from the execution environment.
 
 ### "Cache is v1 format" warning
 
