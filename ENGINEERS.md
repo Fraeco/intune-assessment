@@ -371,7 +371,7 @@ When you add a new baseline policy prefix, add it to `byPolicyNamePrefix`. When 
 | `domain_ratio` | Overall compliance of a domain below a threshold | `domain`, `threshold` |
 | `structural` | Policy-metadata checks | Varies per sub-kind |
 | `naming_convention` (structural sub-kind) | Customer policies not following the SBZ naming pattern | `pattern` |
-| `duplicate_coverage` (structural sub-kind) | Same DefinitionId in N customer policies | `threshold` |
+| `duplicate_coverage` (structural sub-kind) | Unique baseline-scoped conflicting settings from `Get-SettingsConflictSummary` (dedupe by baseline policy + DefinitionId) | `threshold` |
 | `inventory_metric` | Ratio or threshold over inventory list | `collection`, `field`, `op`, `threshold` |
 | `inventory_empty` | Collection is empty when it should not be | `collection` |
 

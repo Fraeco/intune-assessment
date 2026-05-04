@@ -509,6 +509,41 @@ $comparisonResults = Compare-TenantSettings `
     -BaselineSettings $baselineSettings `
     -CustomerSettings $customerSettings
 
+# Multi-policy settings conflict summary (Phase 2.2)
+Write-Host '  Building settings conflict summary...' -ForegroundColor DarkGray
+$settingsConflicts = Get-SettingsConflictSummary `
+    -BaselineSettings $baselineSettings `
+    -CustomerSettings $customerSettings
+
+$conflictSettingKeysWith = @(
+    $settingsConflicts |
+        Where-Object { $_.HasBaseline } |
+        ForEach-Object { '{0}||{1}' -f $_.BaselinePolicyName, $_.DefinitionId } |
+        Select-Object -Unique
+)
+$conflictSettingKeysWithout = @(
+    $settingsConflicts |
+        Where-Object { -not $_.HasBaseline } |
+        ForEach-Object { 'EXTRA||{0}' -f $_.DefinitionId } |
+        Select-Object -Unique
+)
+$conflictUniqueKeys = @(
+    $settingsConflicts |
+        ForEach-Object {
+            if ($_.HasBaseline) { '{0}||{1}' -f $_.BaselinePolicyName, $_.DefinitionId }
+            else { 'EXTRA||{0}' -f $_.DefinitionId }
+        } |
+        Select-Object -Unique
+)
+$conflictUniqueCount = @($conflictUniqueKeys).Count
+
+if ($settingsConflicts.Count -gt 0) {
+    Write-Host ("  Conflict summary: {0} conflicting settings ({1} with baseline, {2} without); {3} detail rows" -f `
+        $conflictUniqueCount, @($conflictSettingKeysWith).Count, @($conflictSettingKeysWithout).Count, $settingsConflicts.Count) -ForegroundColor Yellow
+} else {
+    Write-Host '  Conflict summary: no multi-policy conflicts detected.' -ForegroundColor Green
+}
+
 # Evaluate findings
 Write-Host '  Evaluating findings...' -ForegroundColor DarkGray
 $findings = Get-Findings `
@@ -516,7 +551,8 @@ $findings = Get-Findings `
     -CustomerSettings  $customerSettings `
     -DeviceInventory   $deviceInventory `
     -EnrollmentData    $enrollmentData `
-    -AppInventory      $appInventory
+    -AppInventory      $appInventory `
+    -SettingsConflicts $settingsConflicts
 
 $fCritical = @($findings | Where-Object { $_.Severity -eq 'Critical' }).Count
 $fHigh     = @($findings | Where-Object { $_.Severity -eq 'High'     }).Count
@@ -572,16 +608,26 @@ if ($null -ne $appInventory -and $appInventory.Count -gt 0) {
     Write-Host "  App CSV:        $appCsvPath" -ForegroundColor Green
 }
 
+if ($null -ne $settingsConflicts -and $settingsConflicts.Count -gt 0) {
+    $conflictCsvPath = Export-SettingsConflictsCsv `
+        -Conflicts     $settingsConflicts `
+        -OutputPath    $OutputPath `
+        -CustomerName  $CustomerName `
+        -BaselineLevel $BaselineLevel
+    Write-Host "  Conflict CSV:   $conflictCsvPath" -ForegroundColor Green
+}
+
 if ($GenerateReportData) {
     $jsonPath = Export-ReportData `
-        -Results         $comparisonResults `
-        -OutputPath      $OutputPath `
-        -CustomerName    $CustomerName `
-        -BaselineLevel   $BaselineLevel `
-        -DeviceInventory $deviceInventory `
-        -EnrollmentData  $enrollmentData `
-        -AppInventory    $appInventory `
-        -Findings        $findings
+        -Results           $comparisonResults `
+        -OutputPath        $OutputPath `
+        -CustomerName      $CustomerName `
+        -BaselineLevel     $BaselineLevel `
+        -DeviceInventory   $deviceInventory `
+        -EnrollmentData    $enrollmentData `
+        -AppInventory      $appInventory `
+        -Findings          $findings `
+        -SettingsConflicts $settingsConflicts
     Write-Host "  JSON: $jsonPath" -ForegroundColor Green
 }
 

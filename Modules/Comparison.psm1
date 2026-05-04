@@ -122,6 +122,198 @@ function Compare-TenantSettings {
     return $results
 }
 
+function Get-SettingsConflictSummary {
+    <#
+    .SYNOPSIS
+        Builds a standalone multi-policy settings conflict summary.
+    .DESCRIPTION
+        Detects settings configured by 2+ customer policies with diverging
+        normalized values. Emits one deconcatenated row per contributing
+        customer policy (not comma-joined lists). Baseline scope is still
+        (BaselinePolicyName, DefinitionId) for in-baseline groups; Extra groups
+        are per DefinitionId only.
+
+        Filter rules:
+        - HasBaseline = true:  >= 2 unique customer policies, at least one
+                               customer policy differs from baseline, and
+                               distinct normalized customer values >= 2.
+        - HasBaseline = false: >= 2 unique customer policies, and distinct
+                               normalized customer values >= 2.
+
+        Equality uses Normalize-SettingValue so cosmetic differences
+        (boolean synonyms, JSON key/array order, comma-list order) do not
+        appear as conflicts.
+    .PARAMETER BaselineSettings
+        List[hashtable] of baseline settings (post-enrichment).
+    .PARAMETER CustomerSettings
+        List[hashtable] of customer settings (post-enrichment).
+    .OUTPUTS
+        System.Collections.Generic.List[hashtable] — deconcatenated conflict rows.
+    #>
+    [CmdletBinding()]
+    [OutputType([System.Collections.Generic.List[hashtable]])]
+    param(
+        [Parameter(Mandatory)]
+        [System.Collections.Generic.List[hashtable]]$BaselineSettings,
+
+        [Parameter(Mandatory)]
+        [System.Collections.Generic.List[hashtable]]$CustomerSettings
+    )
+
+    $rows = [System.Collections.Generic.List[hashtable]]::new()
+
+    # Index customer settings by DefinitionId (O(1) lookup, case-insensitive)
+    $customerIndex = [System.Collections.Generic.Dictionary[string, System.Collections.Generic.List[hashtable]]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($s in $CustomerSettings) {
+        if ([string]::IsNullOrWhiteSpace($s.DefinitionId)) { continue }
+        if (-not $customerIndex.ContainsKey($s.DefinitionId)) {
+            $customerIndex[$s.DefinitionId] = [System.Collections.Generic.List[hashtable]]::new()
+        }
+        $customerIndex[$s.DefinitionId].Add($s)
+    }
+
+    # Group baseline settings by (PolicyName, DefinitionId).
+    # Same DefinitionId can be pinned by multiple baseline policies; each
+    # baseline-policy scope produces its own summary row (Robin parity).
+    $baselineGroups = [System.Collections.Generic.Dictionary[string, System.Collections.Generic.List[hashtable]]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $baselineIds    = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($b in $BaselineSettings) {
+        if ([string]::IsNullOrWhiteSpace($b.DefinitionId)) { continue }
+        [void]$baselineIds.Add($b.DefinitionId)
+        $key = '{0}||{1}' -f $b.PolicyName, $b.DefinitionId
+        if (-not $baselineGroups.ContainsKey($key)) {
+            $baselineGroups[$key] = [System.Collections.Generic.List[hashtable]]::new()
+        }
+        $baselineGroups[$key].Add($b)
+    }
+
+    # ── Baseline-covered conflicts (HasBaseline = true) ──────────────────────
+    foreach ($kvp in $baselineGroups.GetEnumerator()) {
+        $baselineGroup = $kvp.Value
+        $baselineFirst = $baselineGroup[0]
+        $defId         = $baselineFirst.DefinitionId
+
+        if (-not $customerIndex.ContainsKey($defId)) { continue }
+        $customerMatches = $customerIndex[$defId]
+
+        $uniquePolicyNames = @(
+            $customerMatches |
+                ForEach-Object { $_.PolicyName } |
+                Where-Object   { -not [string]::IsNullOrWhiteSpace($_) } |
+                Select-Object  -Unique |
+                Sort-Object
+        )
+        if ($uniquePolicyNames.Count -lt 2) { continue }
+
+        $normalizedValues = @(
+            $customerMatches |
+                ForEach-Object { Normalize-SettingValue -Value $_.Value } |
+                Select-Object  -Unique |
+                Sort-Object
+        )
+        if ($normalizedValues.Count -lt 2) { continue }
+
+        # Build deconcatenated rows while preserving summary metadata.
+        $configured = 0
+        $conflict   = 0
+        foreach ($cm in $customerMatches) {
+            if (Compare-SettingValue $cm.Value $baselineFirst.Value) {
+                $configured++
+            } else {
+                $conflict++
+            }
+        }
+        if ($conflict -lt 1) { continue }
+
+        $domain = if ([string]::IsNullOrWhiteSpace($baselineFirst.Domain)) {
+            $customerMatches[0].Domain
+        } else {
+            $baselineFirst.Domain
+        }
+
+        foreach ($cm in $customerMatches) {
+            $matchStatus = if (Compare-SettingValue $cm.Value $baselineFirst.Value) { 'Configured' } else { 'Conflict' }
+            $rows.Add([ordered]@{
+                BaselinePolicyName       = $baselineFirst.PolicyName
+                BaselineSetting          = $baselineFirst.SettingPath
+                BaselineValue            = $baselineFirst.Value
+                PolicyName               = $cm.PolicyName
+                PolicyValue              = $cm.Value
+                PolicyValueNormalized    = Normalize-SettingValue -Value $cm.Value
+                MatchStatus              = $matchStatus
+                DefinitionId             = $defId
+                Domain                   = $domain
+                CategoryId               = $baselineFirst.CategoryId
+                PolicyCount              = $uniquePolicyNames.Count
+                DistinctValueCount       = $normalizedValues.Count
+                HasBaseline              = $true
+            })
+        }
+    }
+
+    # ── Extra (non-baseline) multi-policy divergences (HasBaseline = false) ─
+    foreach ($kvp in $customerIndex.GetEnumerator()) {
+        $defId = $kvp.Key
+        if ($baselineIds.Contains($defId)) { continue }
+
+        $customerMatches = $kvp.Value
+
+        $uniquePolicyNames = @(
+            $customerMatches |
+                ForEach-Object { $_.PolicyName } |
+                Where-Object   { -not [string]::IsNullOrWhiteSpace($_) } |
+                Select-Object  -Unique |
+                Sort-Object
+        )
+        if ($uniquePolicyNames.Count -lt 2) { continue }
+
+        $normalizedValues = @(
+            $customerMatches |
+                ForEach-Object { Normalize-SettingValue -Value $_.Value } |
+                Select-Object  -Unique |
+                Sort-Object
+        )
+        if ($normalizedValues.Count -lt 2) { continue }
+
+        $first = $customerMatches[0]
+        foreach ($cm in $customerMatches) {
+            $rows.Add([ordered]@{
+                BaselinePolicyName       = ''
+                BaselineSetting          = ''
+                BaselineValue            = ''
+                PolicyName               = $cm.PolicyName
+                PolicyValue              = $cm.Value
+                PolicyValueNormalized    = Normalize-SettingValue -Value $cm.Value
+                MatchStatus              = 'Conflict'
+                DefinitionId             = $defId
+                Domain                   = $first.Domain
+                CategoryId               = $first.CategoryId
+                PolicyCount              = $uniquePolicyNames.Count
+                DistinctValueCount       = $normalizedValues.Count
+                HasBaseline              = $false
+            })
+        }
+    }
+
+    # Sort: HasBaseline desc, Domain, BaselinePolicyName, BaselineSetting, PolicyName.
+    $sorted = [System.Collections.Generic.List[hashtable]]::new()
+    foreach ($r in ($rows | Sort-Object `
+            @{ Expression = { $_.HasBaseline };        Descending = $true  }, `
+            @{ Expression = { $_.Domain };             Descending = $false }, `
+            @{ Expression = { $_.BaselinePolicyName }; Descending = $false }, `
+            @{ Expression = { $_.BaselineSetting };    Descending = $false }, `
+            @{ Expression = { $_.PolicyName };         Descending = $false })) {
+        $sorted.Add($r)
+    }
+
+    Write-Verbose ("ConflictSummary: {0} rows ({1} with baseline, {2} without)" -f `
+        $sorted.Count, `
+        @($sorted | Where-Object { $_.HasBaseline }).Count, `
+        @($sorted | Where-Object { -not $_.HasBaseline }).Count)
+
+    return $sorted
+}
+
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
@@ -271,5 +463,6 @@ function Normalize-SettingValue {
 }
 
 Export-ModuleMember -Function @(
-    'Compare-TenantSettings'
+    'Compare-TenantSettings',
+    'Get-SettingsConflictSummary'
 )

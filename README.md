@@ -18,6 +18,7 @@ population.
 - Baseline caching (v2) for faster reruns; hash-based soft re-enrichment on domain mapping changes
 - CSV outputs formatted for Excel (semicolon-delimited, UTF-8 with BOM)
 - Optional `ReportData.json` for summary rollups including inventory sections
+- Multi-policy settings conflict export (`SettingsConflicts.csv`): one row per contributing customer policy (deconcatenated); `IntuneDiff_Export` remains the joined summary
 
 ## Prerequisites
 
@@ -133,6 +134,7 @@ All files are written to `Exports\` by default:
 | `{Customer}_{date}_{Lx}_EnrollmentConfigs.csv` | When inventory collected |
 | `{Customer}_{date}_{Lx}_AutopilotDevices.csv` | When inventory collected |
 | `{Customer}_{date}_{Lx}_AppInventory.csv` | When inventory collected |
+| `{Customer}_{date}_{Lx}_SettingsConflicts.csv` | When multi-policy conflicts detected |
 | `{Customer}_{date}_{Lx}_ReportData.json` | With `-GenerateReportData` |
 
 Baseline cache: `Baseline\baseline-cache.json`

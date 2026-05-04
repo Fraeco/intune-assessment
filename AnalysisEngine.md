@@ -162,20 +162,20 @@ The `AffectedCount` reported is the number of policies that do **not** match any
 
 ### `duplicate_coverage`  *(structuralFindings)*
 
-Fires when the number of comparison rows where a setting is configured in multiple policies (comma-separated `PolicyName`) **and** the result is `Conflict` meets or exceeds the integer `threshold`.
+Fires when the number of **unique** baseline-scoped multi-policy conflicting settings meets or exceeds the integer `threshold`. Uniqueness is `(BaselinePolicyName, DefinitionId)` derived from `Get-SettingsConflictSummary` (in-baseline / `HasBaseline = true` rows only; deconcatenated detail rows are deduplicated for counting).
 
 ```jsonc
 "trigger": {
   "type": "duplicate_coverage",
-  "threshold": 10           // fire when ≥ 10 such conflicting multi-policy rows exist
+  "threshold": 10           // fire when ≥ 10 such conflicting settings exist
 }
 ```
 
 | Field | Type | Description |
 |---|---|---|
-| `threshold` | integer | Minimum count of conflicting multi-policy rows required to trigger |
+| `threshold` | integer | Minimum count of unique conflicting baseline-scoped settings required to trigger |
 
-Multi-policy rows are identified by a comma + space (`", "`) in the `PolicyName` field, which is how the comparison engine joins multiple matching policies onto one row.
+This no longer inspects comma-separated `PolicyName` on diff rows; it uses the explicit conflict summary so thresholds align with “number of settings in conflict,” not “number of CSV detail lines.”
 
 ---
 

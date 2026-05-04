@@ -212,6 +212,45 @@ function Export-EnrollmentCsv {
     return @{ ConfigsCsv = $configPath; AutopilotCsv = $apPath }
 }
 
+function Export-SettingsConflictsCsv {
+    <#
+    .SYNOPSIS
+        Writes multi-policy settings conflicts to a standalone CSV (one row per
+        contributing customer policy; deconcatenated).
+    .PARAMETER Conflicts
+        List[hashtable] as returned by Get-SettingsConflictSummary.
+    .PARAMETER OutputPath
+        Directory where the CSV file will be written.
+    .PARAMETER CustomerName
+        Used to construct the filename.
+    .PARAMETER BaselineLevel
+        Baseline level label (L1/L2/L3/L4) included in the filename.
+    .OUTPUTS
+        String — full path of the written file.
+    #>
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory)] [System.Collections.Generic.List[hashtable]]$Conflicts,
+        [Parameter(Mandatory)] [string]$OutputPath,
+        [string]$CustomerName  = 'Customer',
+        [string]$BaselineLevel = 'L1'
+    )
+
+    if (-not (Test-Path $OutputPath)) {
+        New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
+    }
+
+    $header = '"Baseline Policy Name";"Baseline Setting";"Baseline Value";"Policy Name";"Policy Value";"Policy Value (Normalized)";"Match Status";"Definition Id";"Domain";"Category Id";"Policy Count";"Distinct Value Count";"Has Baseline"'
+    $columns = @('BaselinePolicyName','BaselineSetting','BaselineValue','PolicyName','PolicyValue','PolicyValueNormalized','MatchStatus','DefinitionId','Domain','CategoryId','PolicyCount','DistinctValueCount','HasBaseline')
+
+    $fileName = Get-ExportFileName -CustomerName $CustomerName -BaselineLevel $BaselineLevel -Suffix 'SettingsConflicts'
+    $filePath = Join-Path $OutputPath $fileName
+
+    Write-SemicolonCsv -FilePath $filePath -Header $header -ColumnKeys $columns -Rows $Conflicts
+    return $filePath
+}
+
 function Export-AppInventoryCsv {
     [CmdletBinding()]
     [OutputType([string])]
@@ -271,7 +310,8 @@ function Export-ReportData {
         [System.Collections.Generic.List[hashtable]]$DeviceInventory = $null,
         [hashtable]$EnrollmentData = $null,
         [System.Collections.Generic.List[hashtable]]$AppInventory = $null,
-        [System.Collections.Generic.List[hashtable]]$Findings = $null
+        [System.Collections.Generic.List[hashtable]]$Findings = $null,
+        [System.Collections.Generic.List[hashtable]]$SettingsConflicts = $null
     )
 
     if (-not (Test-Path $OutputPath)) {
@@ -369,6 +409,59 @@ function Export-ReportData {
         }
     }
 
+    # Multi-policy settings conflict summary (optional)
+    if ($null -ne $SettingsConflicts -and $SettingsConflicts.Count -gt 0) {
+        $uniqueSettingKeys = @(
+            $SettingsConflicts |
+                ForEach-Object {
+                    if ($_.HasBaseline) {
+                        '{0}||{1}' -f $_.BaselinePolicyName, $_.DefinitionId
+                    } else {
+                        'EXTRA||{0}' -f $_.DefinitionId
+                    }
+                } |
+                Select-Object -Unique
+        )
+        $withBaselineKeys = @(
+            $SettingsConflicts |
+                Where-Object { $_.HasBaseline } |
+                ForEach-Object { '{0}||{1}' -f $_.BaselinePolicyName, $_.DefinitionId } |
+                Select-Object -Unique
+        )
+        $withoutBaselineKeys = @(
+            $SettingsConflicts |
+                Where-Object { -not $_.HasBaseline } |
+                ForEach-Object { 'EXTRA||{0}' -f $_.DefinitionId } |
+                Select-Object -Unique
+        )
+
+        $byDomain = [ordered]@{}
+        foreach ($g in ($SettingsConflicts | Group-Object Domain | Sort-Object Name)) {
+            $name = if ([string]::IsNullOrWhiteSpace($g.Name)) { 'Unclassified' } else { $g.Name }
+            $domainKeys = @(
+                $g.Group |
+                    ForEach-Object {
+                        if ($_.HasBaseline) {
+                            '{0}||{1}' -f $_.BaselinePolicyName, $_.DefinitionId
+                        } else {
+                            'EXTRA||{0}' -f $_.DefinitionId
+                        }
+                    } |
+                    Select-Object -Unique
+            )
+            $byDomain[$name] = $domainKeys.Count
+        }
+
+        $reportData['SettingsConflicts'] = [ordered]@{
+            TotalConflictingSettings = $uniqueSettingKeys.Count
+            WithBaselineCount        = $withBaselineKeys.Count
+            WithoutBaselineCount     = $withoutBaselineKeys.Count
+            DetailRowCount           = $SettingsConflicts.Count
+            ByDomain                 = $byDomain
+            Items                    = @($SettingsConflicts)
+        }
+    }
+
     # Findings sections (optional — only present when findings engine ran)
     if ($null -ne $Findings -and $Findings.Count -gt 0) {
         # Executive summary — top 3 findings by severity
@@ -463,6 +556,7 @@ Export-ModuleMember -Function @(
     'Export-DeviceInventoryCsv',
     'Export-EnrollmentCsv',
     'Export-AppInventoryCsv',
+    'Export-SettingsConflictsCsv',
     'Export-ReportData',
     'Get-MaturityScore'
 )

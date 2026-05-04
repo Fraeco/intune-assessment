@@ -224,6 +224,9 @@ different values, the comparison is optimistic**: if **any** copy matches the
 baseline it reports `Compliant`. The CSV row shows all policies that define it
 (comma-joined) so you can still spot the inconsistency.
 
+For a focused view of these multi-policy divergences, see
+[**`SettingsConflicts.csv`**](#settingsconflictscsv) below.
+
 ### 5.3 The inventory CSVs
 
 When `-SkipInventory` is **not** used, four additional CSVs are produced:
@@ -263,6 +266,36 @@ Useful filters:
 - `Is Assigned = No` → orphaned apps that never reach users
 - Group by `App Type` → Win32 vs. Store vs. web vs. iOS/Android mix
 
+<a id="settingsconflictscsv"></a>
+**`SettingsConflicts.csv`** — multi-policy settings conflicts (deconcatenated).
+
+Only written when at least one conflicting setting is detected. Unlike
+`IntuneDiff_Export.csv`, this file does **not** join multiple policies into
+one cell: there is **one row per customer policy** that participates in a
+multi-policy divergence for a given `Definition Id`.
+
+Conflict groups (same logic as the engine):
+
+- **Baseline-covered** (`Has Baseline = True`): for each `(Baseline Policy Name,
+  Definition Id)` scope where ≥ 2 customer policies set the same definition
+  with ≥ 2 distinct normalized values and at least one differs from baseline,
+  you get one row per contributing customer policy. `Match Status` is
+  `Configured` or `Conflict` vs that baseline row.
+- **Non-baseline (Extra)** (`Has Baseline = False`): for definitions not in the
+  baseline but set in ≥ 2 customer policies with diverging values, one row per
+  contributing policy.
+
+Columns: Baseline Policy Name; Baseline Setting; Baseline Value; Policy Name;
+Policy Value; Policy Value (Normalized); Match Status; Definition Id; Domain;
+Category Id; Policy Count; Distinct Value Count; Has Baseline.
+
+Useful filters in Excel:
+- `Match Status = Conflict` → policies that disagree with the baseline (when
+  `Has Baseline = True`)
+- Pivot on `Definition Id` + `Policy Name` → see who set what
+- Group by `Domain` → scope remediation
+- `Has Baseline = False` → sprawl not covered by baseline
+
 ### 5.4 The `ReportData.json`
 
 Only written when `-GenerateReportData` is passed. It is the single file the
@@ -275,6 +308,7 @@ ByDomain          — per-domain compliance % and maturity score (0–5)
 DeviceInventory   — totals + breakdown by OS, compliance state, support state, and release
 EnrollmentMethods — enrollment configs + Autopilot devices
 AppInventory      — totals + breakdown by assignment state and app type
+SettingsConflicts — multi-policy conflicts (unique-setting totals, ByDomain, DetailRowCount, deconcatenated Items)
 ExecutiveSummary  — top 3 findings (name, severity, detail, recommendation)
 FindingSummary    — count of findings per severity
 FindingsByDomain  — grouped findings, full recommendations

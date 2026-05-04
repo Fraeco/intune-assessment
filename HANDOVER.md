@@ -952,7 +952,7 @@ Each rule has a `trigger` object with a `type` field. The type determines which 
 | Trigger type | What it checks | Example use |
 |---|---|---|
 | `naming_convention` | Checks customer policy names against wildcard patterns. Fires if **fewer** than `threshold` percent match | "If less than 50% of customer policies follow the SBZ-* naming convention, fire a Medium finding" |
-| `duplicate_coverage` | Counts comparison rows where the customer has the same setting in multiple policies with conflicting values. Fires if count exceeds `threshold` | "If 10 or more settings have conflicting multi-policy values, fire a Low finding" |
+| `duplicate_coverage` | Counts unique baseline-scoped conflicting settings from `Get-SettingsConflictSummary` (deduplicated by `BaselinePolicyName` + `DefinitionId`). Fires if count exceeds `threshold` | "If 10 or more settings have conflicting multi-policy values, fire a Low finding" |
 
 **Inventory trigger types:**
 
@@ -994,6 +994,19 @@ The CSVs use a specific format designed for Excel compatibility:
 - **Embedded quotes doubled** — if a value contains a `"`, it is written as `""` per the CSV standard
 
 **The diff CSV** has 14 columns in a fixed order (defined in `$script:CsvColumns` at line 12). The `DefinitionId` field from the comparison output is deliberately excluded from the CSV — it is an internal key, not useful for report readers.
+
+**The settings conflict CSV** (`{Customer}_{date}_{Lx}_SettingsConflicts.csv`) is produced when `Get-SettingsConflictSummary` returns rows. It captures multi-policy divergences — situations where a single setting (`DefinitionId`) is configured by 2+ customer policies with diverging normalized values. Output is **fully deconcatenated** (one CSV row per customer policy that contributes to the conflict), unlike `IntuneDiff_Export.csv` which joins policy names and values in a single row.
+
+For each qualifying conflict group:
+
+- **Baseline-covered** (`Has Baseline = True`): one row per customer policy match for that `(BaselinePolicyName, DefinitionId)` scope. `Match Status` is `Configured` when the policy value matches the baseline (normalized), else `Conflict`.
+- **Non-baseline (Extra)** (`Has Baseline = False`): one row per customer policy for that `DefinitionId` when values diverge across policies.
+
+Columns: Baseline Policy Name; Baseline Setting; Baseline Value; Policy Name; Policy Value; Policy Value (Normalized); Match Status; Definition Id; Domain; Category Id; Policy Count (unique customer policies for this setting); Distinct Value Count (unique normalized values across those policies); Has Baseline.
+
+`Get-SettingsConflictSummary` filters: a conflict group is emitted only when there are ≥ 2 unique customer policies AND the distinct normalized customer values are ≥ 2; for baseline-covered groups, additionally at least one customer policy value must differ from the baseline. Equality uses the existing `Normalize-SettingValue`, so cosmetic differences (boolean synonyms, JSON object/array order, comma-list order) do not produce false conflicts.
+
+The structural finding `duplicate_coverage` (in `Modules/RecommendationEngine.psm1`) counts **unique** baseline-scoped conflicting settings (keys `BaselinePolicyName` + `DefinitionId`) from this summary instead of inferring from the diff row's joined `PolicyName`. This typically reduces finding volume versus the old heuristic, since it no longer counts multi-policy diff rows where customer values are identical-but-wrong.
 
 **Maturity Score** (lines 405-429):
 
@@ -1053,6 +1066,14 @@ The JSON file contains everything needed to populate the Word report template:
     },
     "FindingsByDomain": {
         "Endpoint Security": [ "...findings sorted by severity..." ]
+    },
+    "SettingsConflicts": {
+        "TotalConflictingSettings": 18,
+        "WithBaselineCount": 14,
+        "WithoutBaselineCount": 4,
+        "DetailRowCount": 42,
+        "ByDomain": { "Endpoint Security": 9, "Device Management": 5, "...": "..." },
+        "Items": [ "...deconcatenated rows: one per customer policy; see Policy Name / Match Status..." ]
     }
 }
 ```

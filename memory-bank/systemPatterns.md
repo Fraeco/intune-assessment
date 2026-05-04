@@ -53,6 +53,15 @@ This contract is the key extensibility pattern: if a new reader emits this shape
 - Enriched fields: `OsFamily`, `OsRelease`, `OsBuild`, `OsSupportState`, `OsEndOfServiceDate`, `OsSource`.
 - `Export.psm1` aggregates lifecycle summaries into `ReportData.json` via `ByOsSupportState`, `ByWindowsRelease`, and `UnsupportedDeviceCount`.
 
+## Multi-Policy Conflict Summary Pattern (Phase 2.2)
+- `Get-SettingsConflictSummary` in `Comparison.psm1` is independent of the optimistic diff: it derives from raw `$customerSettings` and `$baselineSettings` indexed by `DefinitionId`.
+- Output is **deconcatenated**: one row per customer policy row that belongs to a qualifying conflict group (not one aggregated row per setting).
+- Baseline scope is still `(BaselinePolicyName, DefinitionId)` for in-baseline groups (`HasBaseline = true`); Extra groups are per `DefinitionId` (`HasBaseline = false`).
+- Equality uses `Normalize-SettingValue` so cosmetic differences are not flagged as conflicts.
+- Filters: ≥ 2 unique customer policies AND ≥ 2 distinct normalized customer values; in-baseline groups additionally require ≥ 1 customer value differing from baseline.
+- `Export-SettingsConflictsCsv` and the `SettingsConflicts` section in `ReportData.json` are additive outputs; JSON totals deduplicate by setting key; `DetailRowCount` reflects CSV row count.
+- `Invoke-DuplicateCoverageFinding` counts unique `(BaselinePolicyName, DefinitionId)` keys from in-baseline summary rows (threshold parity with “number of conflicting settings”).
+
 ## Caching Pattern
 - Baseline policy cache: `Baseline/baseline-cache.json` (v2 schema with per-policy-type sections)
 - Domain mapping hash enables soft re-enrichment without full re-fetch

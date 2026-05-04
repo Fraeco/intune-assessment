@@ -23,9 +23,9 @@
 ## Robin Merge Plan Tracking
 - Phase 1 (Foundation): implemented
   - Bulk setting definition/category prefetch strategy integrated (`DefinitionCache.psm1` and orchestrator switches).
-- Phase 2 (Quick Wins): in progress
+- Phase 2 (Quick Wins): implemented
   - OS definition + device compliance summary enrichment: implemented (Phase 2.1).
-  - Standalone settings conflict detection summary for multi-policy overlap: pending.
+  - Standalone settings conflict detection summary for multi-policy overlap: implemented (Phase 2.2) — `Get-SettingsConflictSummary`, `Export-SettingsConflictsCsv`, `SettingsConflicts` section in `ReportData.json`, and `duplicate_coverage` finding refactored to consume it.
 - Phase 3 (Visual Reporting): pending
   - HTML report generation module + switch.
   - Graph API POST support as prerequisite for async report flow.
@@ -50,9 +50,8 @@
 - Secret hygiene remains an operational risk area if local config is mishandled
 
 ## Next Steps
-1. Implement Robin Phase 2 remaining quick win (standalone settings conflict summary).
-2. Implement Robin Phase 3 visual reporting foundation.
-3. Implement Robin Phase 4 advanced reporting integrations.
-4. Introduce central logger abstraction and begin replacing `Write-Host`.
-5. Add Pester tests for high-value core logic and wire lint/test in CI.
-6. Return to Sprint 8 Word report generation from backlog after Robin phases 2-4 are delivered.
+1. Implement Robin Phase 3 visual reporting foundation (HTML report module + Graph POST).
+2. Implement Robin Phase 4 advanced reporting integrations (async exports, deployment/app status, assignment analysis).
+3. Introduce central logger abstraction and begin replacing `Write-Host`.
+4. Add Pester tests for high-value core logic (including `Get-SettingsConflictSummary`) and wire lint/test in CI.
+5. Return to Sprint 8 Word report generation from backlog after Robin phases 3-4 are delivered.

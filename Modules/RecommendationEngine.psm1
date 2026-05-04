@@ -99,6 +99,9 @@ function Get-Findings {
         Optional hashtable with EnrollmentConfigs and AutopilotDevices keys.
     .PARAMETER AppInventory
         Optional List[hashtable] of mobile apps.
+    .PARAMETER SettingsConflicts
+        Optional List[hashtable] from Get-SettingsConflictSummary; consumed
+        by structural findings such as `duplicate_coverage`.
     .OUTPUTS
         System.Collections.Generic.List[hashtable] — triggered findings, sorted by severity desc.
     #>
@@ -111,9 +114,10 @@ function Get-Findings {
         [Parameter(Mandatory)]
         [System.Collections.Generic.List[hashtable]]$CustomerSettings,
 
-        [System.Collections.Generic.List[hashtable]]$DeviceInventory = $null,
-        [hashtable]$EnrollmentData = $null,
-        [System.Collections.Generic.List[hashtable]]$AppInventory = $null
+        [System.Collections.Generic.List[hashtable]]$DeviceInventory   = $null,
+        [hashtable]$EnrollmentData                                     = $null,
+        [System.Collections.Generic.List[hashtable]]$AppInventory      = $null,
+        [System.Collections.Generic.List[hashtable]]$SettingsConflicts = $null
     )
 
     $findings = [System.Collections.Generic.List[hashtable]]::new()
@@ -131,7 +135,11 @@ function Get-Findings {
 
     # ── Structural findings ─────────────────────────────────────────────────
     foreach ($rule in $script:FindingRules.structuralFindings) {
-        $finding = Invoke-StructuralFinding -Rule $rule -Results $ComparisonResults -CustomerSettings $CustomerSettings
+        $finding = Invoke-StructuralFinding `
+            -Rule $rule `
+            -Results $ComparisonResults `
+            -CustomerSettings $CustomerSettings `
+            -SettingsConflicts $SettingsConflicts
         if ($finding) { $findings.Add($finding) }
     }
 
@@ -252,7 +260,8 @@ function Invoke-StructuralFinding {
     param(
         [psobject]$Rule,
         [System.Collections.Generic.List[hashtable]]$Results,
-        [System.Collections.Generic.List[hashtable]]$CustomerSettings
+        [System.Collections.Generic.List[hashtable]]$CustomerSettings,
+        [System.Collections.Generic.List[hashtable]]$SettingsConflicts = $null
     )
 
     $trigger = $Rule.trigger
@@ -263,7 +272,7 @@ function Invoke-StructuralFinding {
             return Invoke-NamingConventionFinding -Rule $Rule -CustomerSettings $CustomerSettings
         }
         'duplicate_coverage' {
-            return Invoke-DuplicateCoverageFinding -Rule $Rule -Results $Results
+            return Invoke-DuplicateCoverageFinding -Rule $Rule -SettingsConflicts $SettingsConflicts
         }
         default {
             Write-Verbose "Unknown structural trigger type '$type' for rule '$($Rule.id)'"
@@ -304,22 +313,30 @@ function Invoke-NamingConventionFinding {
 }
 
 function Invoke-DuplicateCoverageFinding {
-    param([psobject]$Rule, [System.Collections.Generic.List[hashtable]]$Results)
+    param(
+        [psobject]$Rule,
+        [System.Collections.Generic.List[hashtable]]$SettingsConflicts = $null
+    )
 
     $trigger   = $Rule.trigger
     $threshold = [int]$trigger.threshold
 
-    # Find rows where PolicyName contains ", " (multiple policies) AND Result is Conflict
-    $duplicates = @($Results | Where-Object {
-        $_.PolicyName -and
-        $_.PolicyName -match ', ' -and
-        $_.Result -eq 'Conflict'
-    })
+    if ($null -eq $SettingsConflicts) { return $null }
 
-    if ($duplicates.Count -lt $threshold) { return $null }
+    # Count unique baseline-covered conflicting settings.
+    # SettingsConflicts can be deconcatenated (multiple rows per setting),
+    # so we deduplicate by (BaselinePolicyName, DefinitionId).
+    $duplicateKeys = @(
+        $SettingsConflicts |
+            Where-Object { $_.HasBaseline } |
+            ForEach-Object { '{0}||{1}' -f $_.BaselinePolicyName, $_.DefinitionId } |
+            Select-Object -Unique
+    )
+
+    if ($duplicateKeys.Count -lt $threshold) { return $null }
 
     return New-Finding -Rule $Rule -Category 'structural' `
-        -AffectedCount $duplicates.Count -Total $duplicates.Count -Ratio 1.0
+        -AffectedCount $duplicateKeys.Count -Total $duplicateKeys.Count -Ratio 1.0
 }
 
 # ---------------------------------------------------------------------------
