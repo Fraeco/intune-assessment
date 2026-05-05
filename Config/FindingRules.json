@@ -296,6 +296,36 @@
       },
       "detail": "{count} instellingen zijn geconfigureerd in meerdere klantbeleidsregels met verschillende waarden. Dit creëert onduidelijkheid over de effectieve configuratie en kan onverwacht gedrag veroorzaken afhankelijk van beleidsvoorkeur.",
       "recommendation": "Controleer overlappende beleidsregels en consolideer instellingen om conflicten te vermijden. Gebruik Intune's rapportage over beleidsconflicten om te bepalen welk beleid van toepassing is. Overweeg overlappende beleidsregels samen te voegen waar mogelijk."
+    },
+    {
+      "id": "unassigned-policies-detected",
+      "name": "Niet-toegewezen beleidsregels gedetecteerd",
+      "domain": "Operations & Monitoring",
+      "severity": "Medium",
+      "trigger": {
+        "type": "phase4_metric",
+        "source": "assignmentSummary",
+        "field": "UnassignedPolicyCount",
+        "operator": "count_gte",
+        "threshold": 1
+      },
+      "detail": "Er zijn {count} beleidsregels zonder toewijzing. Niet-toegewezen beleid wordt niet afgedwongen en verhoogt beheeroverhead.",
+      "recommendation": "Controleer niet-toegewezen beleidsregels, wijs ze toe aan de juiste doelgroepen of verwijder ze om configuratieruis te beperken."
+    },
+    {
+      "id": "apps-with-install-failures",
+      "name": "Applicaties met installatiefouten",
+      "domain": "Application Lifecycle",
+      "severity": "Medium",
+      "trigger": {
+        "type": "phase4_metric",
+        "source": "advancedSummary",
+        "field": "AppsWithFailures",
+        "operator": "count_gte",
+        "threshold": 1
+      },
+      "detail": "{count} applicaties tonen installatiefouten in de geaggregeerde Intune-rapportage.",
+      "recommendation": "Onderzoek de betrokken applicaties en herstel detectieregels, afhankelijkheden of requirements om het foutpercentage te verlagen."
     }
   ],
 

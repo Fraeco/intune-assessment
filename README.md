@@ -120,6 +120,8 @@ Filter baseline policies and force cache refresh:
 | `GenerateReportData` | switch | Write `ReportData.json` with aggregated scores and inventory |
 | `GenerateHtmlReport` | switch | Write `AssessmentReport.html` with executive and detailed sections |
 | `SkipInventory` | switch | Skip device/enrollment/app inventory collection |
+| `EnableAdvancedReporting` | switch | Enable async Intune reports (`AppInstallStatusAggregate`, `DeviceAssignmentStatusByConfigurationPolicy`) |
+| `EnableAssignmentAnalysis` | switch | Analyze assignment targets and dead/unassigned policy signals |
 | `PreferGraphOsLifecycle` | switch | Prefer Graph lifecycle source for OS metadata, with static fallback |
 | `DisableGraphOsLifecycle` | switch | Disable Graph lifecycle lookup and force static `Config\OSDefinition.json` |
 | `PolicyTypes` | string[] | Subset of policy types to compare (default: all 6) |
@@ -138,8 +140,17 @@ All files are written to `Exports\` by default:
 | `{Customer}_{date}_{Lx}_AutopilotDevices.csv` | When inventory collected |
 | `{Customer}_{date}_{Lx}_AppInventory.csv` | When inventory collected |
 | `{Customer}_{date}_{Lx}_SettingsConflicts.csv` | When multi-policy conflicts detected |
+| `{Customer}_{date}_{Lx}_AppInstallStatusAggregateSummary.csv` | With `-EnableAdvancedReporting` |
+| `{Customer}_{date}_{Lx}_DeviceAssignmentStatusByConfigurationPolicy.csv` | With `-EnableAdvancedReporting` |
+| `{Customer}_{date}_{Lx}_PolicyStatusOverviewSummary.csv` | With `-EnableAdvancedReporting` |
+| `{Customer}_{date}_{Lx}_PolicyAssignmentSummary.csv` | With `-EnableAssignmentAnalysis` |
 | `{Customer}_{date}_{Lx}_ReportData.json` | With `-GenerateReportData` |
 | `{Customer}_{date}_{Lx}_AssessmentReport.html` | With `-GenerateHtmlReport` |
+
+Advanced HTML report behavior:
+- When `-GenerateHtmlReport` is combined with `-EnableAdvancedReporting` and/or `-EnableAssignmentAnalysis`, the report includes additional collapsible advanced-analysis tables.
+- Advanced tables support in-browser column sorting and per-table filters.
+- Advanced sections render up to 500 rows each for predictable report performance.
 
 Baseline cache: `Baseline\baseline-cache.json`
 
@@ -159,6 +170,8 @@ Modules\
   DeviceInventoryReader.psm1   — Managed device inventory
   EnrollmentAnalyzer.psm1      — Enrollment configs + Autopilot devices
   AppInventoryReader.psm1      — App inventory with assignment data
+  IntuneReportExporter.psm1    — Async report export jobs + normalization (Phase 4)
+  AssignmentAnalysis.psm1      — Assignment target analysis and dead/unassigned detection
   OsLifecycleProvider.psm1     — OS lifecycle resolver (Graph-first, static fallback)
   Comparison.psm1              — Diff engine (Compliant/Conflict/Missing/Extra)
   Enrichment.psm1              — Domain enrichment via DomainMapping.json

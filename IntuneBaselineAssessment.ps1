@@ -124,6 +124,8 @@ param(
     [switch]$GenerateReportData,
     [switch]$GenerateHtmlReport,
     [switch]$SkipInventory,
+    [switch]$EnableAdvancedReporting,
+    [switch]$EnableAssignmentAnalysis,
     [switch]$PreferGraphOsLifecycle = $true,
     [switch]$DisableGraphOsLifecycle,
 
@@ -160,7 +162,7 @@ Write-Host ''
 # ─────────────────────────────────────────────────────────────────────────────
 $moduleRoot = Join-Path $PSScriptRoot 'Modules'
 
-foreach ($moduleName in @('Auth', 'GraphAPI', 'DefinitionCache', 'PolicyReader', 'EndpointSecurityReader', 'DeviceConfigReader', 'AdminTemplateReader', 'CompliancePolicyReader', 'SecurityBaselineReader', 'OsLifecycleProvider', 'DeviceInventoryReader', 'EnrollmentAnalyzer', 'AppInventoryReader', 'Comparison', 'Enrichment', 'RecommendationEngine', 'Export', 'HtmlReportGenerator')) {
+foreach ($moduleName in @('Auth', 'GraphAPI', 'DefinitionCache', 'PolicyReader', 'EndpointSecurityReader', 'DeviceConfigReader', 'AdminTemplateReader', 'CompliancePolicyReader', 'SecurityBaselineReader', 'OsLifecycleProvider', 'DeviceInventoryReader', 'EnrollmentAnalyzer', 'AppInventoryReader', 'IntuneReportExporter', 'AssignmentAnalysis', 'Comparison', 'Enrichment', 'RecommendationEngine', 'Export', 'HtmlReportGenerator')) {
     $modulePath = Join-Path $moduleRoot "$moduleName.psm1"
     if (-not (Test-Path $modulePath)) {
         throw "Required module not found: $modulePath"
@@ -440,7 +442,7 @@ if ($null -eq $baselineSettings) {
         securityBaselines  = @($baselineSettings | Where-Object { $_.PolicyTemplate -eq 'Security Baseline' })
     }
     $cachePayload | ConvertTo-Json -Depth 10 | Set-Content $baselineCacheFile -Encoding UTF8
-    Write-Host "  Baseline cached ($($baselineSettings.Count) settings): $baselineCacheFile" -ForegroundColor DarkGray
+    Write-Host ('  Baseline cached ({0} settings): {1}' -f $baselineSettings.Count, $baselineCacheFile) -ForegroundColor DarkGray
 }
 
 # ── Apply BaselineLevel filter (post-load) ──────────────────────────────────
@@ -448,7 +450,7 @@ $preFilterCount = $baselineSettings.Count
 $baselineSettings = Select-BaselineByLevel -Settings $baselineSettings -Level $BaselineLevel
 
 if ($BaselineLevel -ne 'All') {
-    Write-Host "  Level filter ($BaselineLevel cumulative): $($baselineSettings.Count) of $preFilterCount settings." -ForegroundColor DarkGray
+    Write-Host ('  Level filter ({0} cumulative): {1} of {2} settings.' -f $BaselineLevel, $baselineSettings.Count, $preFilterCount) -ForegroundColor DarkGray
 }
 if ($baselineSettings.Count -eq 0) {
     Write-Warning "No baseline settings match level '$BaselineLevel'. Check that baseline policies contain '-$BaselineLevel-' in their names."
@@ -504,10 +506,49 @@ else {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Step 4 — Compare
+# Step 4 — Advanced reporting and assignment analysis (optional)
+# ─────────────────────────────────────────────────────────────────────────────
+$phase4Data = $null
+$assignmentAnalysis = $null
+
+if ($EnableAdvancedReporting -or $EnableAssignmentAnalysis) {
+    Write-Host ''
+    Write-Host '[4/6] Customer tenant — advanced reporting' -ForegroundColor Yellow
+}
+
+if ($EnableAdvancedReporting) {
+    try {
+        Write-Host '  Collecting Intune advanced report exports...' -ForegroundColor DarkGray
+        $phase4Data = Get-IntuneAdvancedReportData `
+            -Token $customerToken `
+            -BaseUrl $baseUrl `
+            -CustomerSettings $customerSettings `
+            -TempPath $env:TEMP
+        Write-Host ('  Advanced reports collected: {0} policy status rows, {1} app aggregate rows.' -f $phase4Data.Summary.PolicyStatusRows, $phase4Data.Summary.AppCount) -ForegroundColor Green
+    }
+    catch {
+        Write-Warning ('  Advanced reporting failed and will be skipped: {0}' -f $_.Exception.Message)
+        $phase4Data = $null
+    }
+}
+
+if ($EnableAssignmentAnalysis) {
+    try {
+        Write-Host '  Running assignment analysis...' -ForegroundColor DarkGray
+        $assignmentAnalysis = Get-AssignmentAnalysis -Token $customerToken -BaseUrl $baseUrl
+        Write-Host ('  Assignment analysis complete: {0} unassigned, {1} potentially dead.' -f $assignmentAnalysis.Summary.UnassignedPolicyCount, $assignmentAnalysis.Summary.PotentiallyDeadPolicyCount) -ForegroundColor Green
+    }
+    catch {
+        Write-Warning ('  Assignment analysis failed and will be skipped: {0}' -f $_.Exception.Message)
+        $assignmentAnalysis = $null
+    }
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Step 5 — Compare
 # ─────────────────────────────────────────────────────────────────────────────
 Write-Host ''
-Write-Host '[4/5] Comparing settings...' -ForegroundColor Yellow
+Write-Host '[5/6] Comparing settings...' -ForegroundColor Yellow
 
 $comparisonResults = Compare-TenantSettings `
     -BaselineSettings $baselineSettings `
@@ -556,7 +597,9 @@ $findings = Get-Findings `
     -DeviceInventory   $deviceInventory `
     -EnrollmentData    $enrollmentData `
     -AppInventory      $appInventory `
-    -SettingsConflicts $settingsConflicts
+    -SettingsConflicts $settingsConflicts `
+    -Phase4Data        $phase4Data `
+    -AssignmentAnalysis $assignmentAnalysis
 
 $fCritical = @($findings | Where-Object { $_.Severity -eq 'Critical' }).Count
 $fHigh     = @($findings | Where-Object { $_.Severity -eq 'High'     }).Count
@@ -570,10 +613,10 @@ if ($findings.Count -gt 0) {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Step 5 — Export
+# Step 6 — Export
 # ─────────────────────────────────────────────────────────────────────────────
 Write-Host ''
-Write-Host '[5/5] Exporting results...' -ForegroundColor Yellow
+Write-Host '[6/6] Exporting results...' -ForegroundColor Yellow
 
 $csvPath = Export-DiffCsv `
     -Results       $comparisonResults `
@@ -621,6 +664,42 @@ if ($null -ne $settingsConflicts -and $settingsConflicts.Count -gt 0) {
     Write-Host "  Conflict CSV:   $conflictCsvPath" -ForegroundColor Green
 }
 
+if ($null -ne $phase4Data) {
+    if ($phase4Data.ContainsKey('AppInstallStatusAggregate') -and $phase4Data.AppInstallStatusAggregate.Count -gt 0) {
+        $appInstallCsvPath = Export-AppInstallStatusAggregateCsv `
+            -Rows $phase4Data.AppInstallStatusAggregate `
+            -OutputPath $OutputPath `
+            -CustomerName $CustomerName `
+            -BaselineLevel $BaselineLevel
+        Write-Host ('  App Install CSV: {0}' -f $appInstallCsvPath) -ForegroundColor Green
+    }
+    if ($phase4Data.ContainsKey('DeviceAssignmentStatusByConfigurationPolicy') -and $phase4Data.DeviceAssignmentStatusByConfigurationPolicy.Count -gt 0) {
+        $policyStatusDetailCsv = Export-DeviceAssignmentStatusByConfigurationPolicyCsv `
+            -Rows $phase4Data.DeviceAssignmentStatusByConfigurationPolicy `
+            -OutputPath $OutputPath `
+            -CustomerName $CustomerName `
+            -BaselineLevel $BaselineLevel
+        Write-Host ('  Policy Status Detail CSV: {0}' -f $policyStatusDetailCsv) -ForegroundColor Green
+    }
+    if ($phase4Data.ContainsKey('PolicyStatusOverview') -and $phase4Data.PolicyStatusOverview.Count -gt 0) {
+        $policyStatusOverviewCsv = Export-PolicyStatusOverviewCsv `
+            -Rows $phase4Data.PolicyStatusOverview `
+            -OutputPath $OutputPath `
+            -CustomerName $CustomerName `
+            -BaselineLevel $BaselineLevel
+        Write-Host ('  Policy Status Overview CSV: {0}' -f $policyStatusOverviewCsv) -ForegroundColor Green
+    }
+}
+
+if ($null -ne $assignmentAnalysis -and $assignmentAnalysis.ContainsKey('PolicyAssignmentSummary') -and $assignmentAnalysis.PolicyAssignmentSummary.Count -gt 0) {
+    $assignmentCsvPath = Export-PolicyAssignmentSummaryCsv `
+        -Rows $assignmentAnalysis.PolicyAssignmentSummary `
+        -OutputPath $OutputPath `
+        -CustomerName $CustomerName `
+        -BaselineLevel $BaselineLevel
+    Write-Host ('  Assignment Summary CSV: {0}' -f $assignmentCsvPath) -ForegroundColor Green
+}
+
 if ($GenerateReportData) {
     $jsonPath = Export-ReportData `
         -Results           $comparisonResults `
@@ -631,7 +710,9 @@ if ($GenerateReportData) {
         -EnrollmentData    $enrollmentData `
         -AppInventory      $appInventory `
         -Findings          $findings `
-        -SettingsConflicts $settingsConflicts
+        -SettingsConflicts $settingsConflicts `
+        -Phase4Data        $phase4Data `
+        -AssignmentAnalysis $assignmentAnalysis
     Write-Host "  JSON: $jsonPath" -ForegroundColor Green
 }
 
@@ -645,7 +726,9 @@ if ($GenerateHtmlReport) {
         -EnrollmentData    $enrollmentData `
         -AppInventory      $appInventory `
         -Findings          $findings `
-        -SettingsConflicts $settingsConflicts
+        -SettingsConflicts $settingsConflicts `
+        -Phase4Data        $phase4Data `
+        -AssignmentAnalysis $assignmentAnalysis
     Write-Host "  HTML: $htmlPath" -ForegroundColor Green
 }
 

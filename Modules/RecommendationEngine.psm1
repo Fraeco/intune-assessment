@@ -117,7 +117,9 @@ function Get-Findings {
         [System.Collections.Generic.List[hashtable]]$DeviceInventory   = $null,
         [hashtable]$EnrollmentData                                     = $null,
         [System.Collections.Generic.List[hashtable]]$AppInventory      = $null,
-        [System.Collections.Generic.List[hashtable]]$SettingsConflicts = $null
+        [System.Collections.Generic.List[hashtable]]$SettingsConflicts = $null,
+        [hashtable]$Phase4Data                                         = $null,
+        [hashtable]$AssignmentAnalysis                                 = $null
     )
 
     $findings = [System.Collections.Generic.List[hashtable]]::new()
@@ -139,7 +141,9 @@ function Get-Findings {
             -Rule $rule `
             -Results $ComparisonResults `
             -CustomerSettings $CustomerSettings `
-            -SettingsConflicts $SettingsConflicts
+            -SettingsConflicts $SettingsConflicts `
+            -Phase4Data $Phase4Data `
+            -AssignmentAnalysis $AssignmentAnalysis
         if ($finding) { $findings.Add($finding) }
     }
 
@@ -261,7 +265,9 @@ function Invoke-StructuralFinding {
         [psobject]$Rule,
         [System.Collections.Generic.List[hashtable]]$Results,
         [System.Collections.Generic.List[hashtable]]$CustomerSettings,
-        [System.Collections.Generic.List[hashtable]]$SettingsConflicts = $null
+        [System.Collections.Generic.List[hashtable]]$SettingsConflicts = $null,
+        [hashtable]$Phase4Data = $null,
+        [hashtable]$AssignmentAnalysis = $null
     )
 
     $trigger = $Rule.trigger
@@ -274,11 +280,58 @@ function Invoke-StructuralFinding {
         'duplicate_coverage' {
             return Invoke-DuplicateCoverageFinding -Rule $Rule -SettingsConflicts $SettingsConflicts
         }
+        'phase4_metric' {
+            return Invoke-Phase4MetricFinding -Rule $Rule -Phase4Data $Phase4Data -AssignmentAnalysis $AssignmentAnalysis
+        }
         default {
             Write-Verbose "Unknown structural trigger type '$type' for rule '$($Rule.id)'"
             return $null
         }
     }
+}
+
+function Invoke-Phase4MetricFinding {
+    param(
+        [psobject]$Rule,
+        [hashtable]$Phase4Data = $null,
+        [hashtable]$AssignmentAnalysis = $null
+    )
+
+    $trigger = $Rule.trigger
+    $source = "$($trigger.source)"
+    $field = "$($trigger.field)"
+    $operator = "$($trigger.operator)"
+    $threshold = [double]$trigger.threshold
+
+    $metricValue = 0
+    switch ($source) {
+        'assignmentSummary' {
+            if ($AssignmentAnalysis -and $AssignmentAnalysis.ContainsKey('Summary')) {
+                $summary = $AssignmentAnalysis.Summary
+                if ($summary.PSObject.Properties[$field]) {
+                    $metricValue = [double]$summary.$field
+                }
+            }
+        }
+        'advancedSummary' {
+            if ($Phase4Data -and $Phase4Data.ContainsKey('Summary')) {
+                $summary = $Phase4Data.Summary
+                if ($summary.PSObject.Properties[$field]) {
+                    $metricValue = [double]$summary.$field
+                }
+            }
+        }
+    }
+
+    $fired = switch ($operator) {
+        'count_gte' { $metricValue -ge $threshold }
+        'count_gt' { $metricValue -gt $threshold }
+        default { $metricValue -ge $threshold }
+    }
+    if (-not $fired) { return $null }
+
+    return New-Finding -Rule $Rule -Category 'structural' `
+        -AffectedCount ([int]$metricValue) -Total ([int]$metricValue) -Ratio 1.0
 }
 
 function Invoke-NamingConventionFinding {

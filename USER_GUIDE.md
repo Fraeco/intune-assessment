@@ -173,6 +173,8 @@ Valid values: `SettingsCatalog`, `EndpointSecurity`, `DeviceConfig`,
 | `-SkipInventory` |   | Skip device/enrollment/app inventory collection |
 | `-GenerateReportData` |   | Also write `ReportData.json` |
 | `-GenerateHtmlReport` |   | Also write `AssessmentReport.html` |
+| `-EnableAdvancedReporting` |   | Run async Intune report exports for app install aggregate + policy assignment status |
+| `-EnableAssignmentAnalysis` |   | Analyze policy assignments (target resolution + unassigned/potentially-dead policy signals) |
 | `-PreferGraphOsLifecycle` |   | Prefer Graph OS lifecycle source; falls back to static mapping automatically |
 | `-DisableGraphOsLifecycle` |   | Force static `Config\OSDefinition.json` and skip Graph lifecycle calls |
 | `-ConfigPath` |   | Location of `AppConfig.json` and `DomainMapping.json` (default: `Config\`) |
@@ -270,6 +272,22 @@ Useful filters:
 - `Is Assigned = No` → orphaned apps that never reach users
 - Group by `App Type` → Win32 vs. Store vs. web vs. iOS/Android mix
 
+### 5.4 Phase 4 advanced reporting CSVs
+
+When `-EnableAdvancedReporting` is enabled, three additional CSVs are produced:
+
+- **`AppInstallStatusAggregateSummary.csv`**  
+  App-level aggregate install states (failed/installed/pending/not-applicable), per platform.
+- **`DeviceAssignmentStatusByConfigurationPolicy.csv`**  
+  Policy deployment status rows (policy/device/user/report status).
+- **`PolicyStatusOverviewSummary.csv`**  
+  Per-policy roll-up of deployment states (`Succeeded`, `Pending`, `Error`, `Failed`, `InProgress`, `Conflict`, `NotApplicable`) including `NotDeployed` markers.
+
+When `-EnableAssignmentAnalysis` is enabled, one additional CSV is produced:
+
+- **`PolicyAssignmentSummary.csv`**  
+  Per-policy assignment overview with resolved targets and flags (`HasIncludeTarget`, `HasExcludeOnly`, `IsUnassigned`, `IsPotentiallyDead`).
+
 <a id="settingsconflictscsv"></a>
 **`SettingsConflicts.csv`** — multi-policy settings conflicts (deconcatenated).
 
@@ -300,7 +318,7 @@ Useful filters in Excel:
 - Group by `Domain` → scope remediation
 - `Has Baseline = False` → sprawl not covered by baseline
 
-### 5.4 The `ReportData.json`
+### 5.5 The `ReportData.json`
 
 Only written when `-GenerateReportData` is passed. It is the single file the
 Word report template reads. Top-level shape:
@@ -313,6 +331,8 @@ DeviceInventory   — totals + breakdown by OS, compliance state, support state,
 EnrollmentMethods — enrollment configs + Autopilot devices
 AppInventory      — totals + breakdown by assignment state and app type
 SettingsConflicts — multi-policy conflicts (unique-setting totals, ByDomain, DetailRowCount, deconcatenated Items)
+AdvancedReporting — Phase 4 report export summaries + detailed rows
+AssignmentAnalysis — policy assignment summary, unassigned and potentially dead policy sets
 ExecutiveSummary  — top 3 findings (name, severity, detail, recommendation)
 FindingSummary    — count of findings per severity
 FindingsByDomain  — grouped findings, full recommendations
@@ -321,7 +341,7 @@ FindingsByDomain  — grouped findings, full recommendations
 You generally don't read this file by hand — it exists so the report template
 can populate itself.
 
-### 5.5 The `AssessmentReport.html`
+### 5.6 The `AssessmentReport.html`
 
 Only written when `-GenerateHtmlReport` is passed. It is a self-contained HTML
 file that can be opened in any browser and shared as a quick readout.
@@ -332,17 +352,28 @@ Structure:
 - **Baseline Policy Overview**: per-policy totals for total/compliant/conflict/missing
 - **Detailed Sections** (collapsible): top findings, settings conflicts,
   comparison sample rows, and inventory highlights
+- **Advanced Analysis Sections** (collapsible, when phase 4 data is present):
+  - `AllPolicyStatusOverview` (filter: `NotDeployed`)
+  - `AllPolicyAssignmentSummary` (filters: `HasIncludeTarget`, `HasExcludeOnly`, `IsUnassigned`, `IsPotentiallyDead`)
+  - `AllDeviceAssignmentStatusByConfigurationPolicy` (filter: `ReportStatus`)
+  - `AppInstallStatusAggregateSummary` (filters: `Publisher`, `Platform`)
+
+Interactive behavior in advanced sections:
+- Click any column header to sort ascending/descending.
+- Use filter dropdowns to narrow rows within that section.
+- Rows are color-coded for key states (for example failed/error/pending/not-deployed).
+- For performance, each advanced section renders up to 500 rows.
 
 This report is intentionally additive and does not replace CSV/JSON outputs.
 
-### 5.6 Device lifecycle fields in `ReportData.json`
+### 5.7 Device lifecycle fields in `ReportData.json`
 
 The `DeviceInventory` block includes:
 - `ByOsSupportState` (Supported/Unsupported/Unknown counts)
 - `ByWindowsRelease` (release label counts, e.g. Windows 11 23H2)
 - `UnsupportedDeviceCount`
 
-### 5.7 The console summary
+### 5.8 The console summary
 
 At the end of the run the tool prints something like:
 

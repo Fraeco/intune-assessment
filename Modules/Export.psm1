@@ -275,6 +275,98 @@ function Export-AppInventoryCsv {
     return $filePath
 }
 
+function Export-AppInstallStatusAggregateCsv {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory)] [object[]]$Rows,
+        [Parameter(Mandatory)] [string]$OutputPath,
+        [string]$CustomerName  = 'Customer',
+        [string]$BaselineLevel = 'L1'
+    )
+
+    if (-not (Test-Path $OutputPath)) {
+        New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
+    }
+
+    $header  = '"Application Id";"Display Name";"Publisher";"Platform";"Failed Device Count";"Failed Device Percentage";"Installed Device Count";"Pending Install Device Count";"Not Applicable Device Count"'
+    $columns = @('ApplicationId','DisplayName','Publisher','Platform','FailedDeviceCount','FailedDevicePercentage','InstalledDeviceCount','PendingInstallDeviceCount','NotApplicableDeviceCount')
+    $fileName = Get-ExportFileName -CustomerName $CustomerName -BaselineLevel $BaselineLevel -Suffix 'AppInstallStatusAggregateSummary'
+    $filePath = Join-Path $OutputPath $fileName
+
+    Write-SemicolonCsv -FilePath $filePath -Header $header -ColumnKeys $columns -Rows $Rows
+    return $filePath
+}
+
+function Export-DeviceAssignmentStatusByConfigurationPolicyCsv {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory)] [object[]]$Rows,
+        [Parameter(Mandatory)] [string]$OutputPath,
+        [string]$CustomerName  = 'Customer',
+        [string]$BaselineLevel = 'L1'
+    )
+
+    if (-not (Test-Path $OutputPath)) {
+        New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
+    }
+
+    $header  = '"Policy Id";"Policy Name";"Device Name";"User Name";"Report Status"'
+    $columns = @('PolicyId','PolicyName','DeviceName','UserName','ReportStatus')
+    $fileName = Get-ExportFileName -CustomerName $CustomerName -BaselineLevel $BaselineLevel -Suffix 'DeviceAssignmentStatusByConfigurationPolicy'
+    $filePath = Join-Path $OutputPath $fileName
+
+    Write-SemicolonCsv -FilePath $filePath -Header $header -ColumnKeys $columns -Rows $Rows
+    return $filePath
+}
+
+function Export-PolicyStatusOverviewCsv {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory)] [object[]]$Rows,
+        [Parameter(Mandatory)] [string]$OutputPath,
+        [string]$CustomerName  = 'Customer',
+        [string]$BaselineLevel = 'L1'
+    )
+
+    if (-not (Test-Path $OutputPath)) {
+        New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
+    }
+
+    $header  = '"Policy Id";"Policy Name";"Total";"Succeeded";"Pending";"Error";"Failed";"InProgress";"Conflict";"NotApplicable";"NotDeployed"'
+    $columns = @('PolicyId','PolicyName','Total','Succeeded','Pending','Error','Failed','InProgress','Conflict','NotApplicable','NotDeployed')
+    $fileName = Get-ExportFileName -CustomerName $CustomerName -BaselineLevel $BaselineLevel -Suffix 'PolicyStatusOverviewSummary'
+    $filePath = Join-Path $OutputPath $fileName
+
+    Write-SemicolonCsv -FilePath $filePath -Header $header -ColumnKeys $columns -Rows $Rows
+    return $filePath
+}
+
+function Export-PolicyAssignmentSummaryCsv {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory)] [object[]]$Rows,
+        [Parameter(Mandatory)] [string]$OutputPath,
+        [string]$CustomerName  = 'Customer',
+        [string]$BaselineLevel = 'L1'
+    )
+
+    if (-not (Test-Path $OutputPath)) {
+        New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
+    }
+
+    $header  = '"Policy Id";"Policy Name";"Assignment Count";"Targets";"Has Include Target";"Has Exclude Only";"Is Unassigned";"Is Potentially Dead"'
+    $columns = @('PolicyId','PolicyName','AssignmentCount','Targets','HasIncludeTarget','HasExcludeOnly','IsUnassigned','IsPotentiallyDead')
+    $fileName = Get-ExportFileName -CustomerName $CustomerName -BaselineLevel $BaselineLevel -Suffix 'PolicyAssignmentSummary'
+    $filePath = Join-Path $OutputPath $fileName
+
+    Write-SemicolonCsv -FilePath $filePath -Header $header -ColumnKeys $columns -Rows $Rows
+    return $filePath
+}
+
 # ---------------------------------------------------------------------------
 # Public — ReportData.json
 # ---------------------------------------------------------------------------
@@ -311,7 +403,9 @@ function Export-ReportData {
         [hashtable]$EnrollmentData = $null,
         [System.Collections.Generic.List[hashtable]]$AppInventory = $null,
         [System.Collections.Generic.List[hashtable]]$Findings = $null,
-        [System.Collections.Generic.List[hashtable]]$SettingsConflicts = $null
+        [System.Collections.Generic.List[hashtable]]$SettingsConflicts = $null,
+        [hashtable]$Phase4Data = $null,
+        [hashtable]$AssignmentAnalysis = $null
     )
 
     if (-not (Test-Path $OutputPath)) {
@@ -462,6 +556,24 @@ function Export-ReportData {
         }
     }
 
+    if ($null -ne $Phase4Data) {
+        $reportData['AdvancedReporting'] = [ordered]@{
+            Summary = if ($Phase4Data.ContainsKey('Summary')) { $Phase4Data.Summary } else { @{} }
+            AppInstallStatusAggregate = if ($Phase4Data.ContainsKey('AppInstallStatusAggregate')) { @($Phase4Data.AppInstallStatusAggregate) } else { @() }
+            DeviceAssignmentStatusByConfigurationPolicy = if ($Phase4Data.ContainsKey('DeviceAssignmentStatusByConfigurationPolicy')) { @($Phase4Data.DeviceAssignmentStatusByConfigurationPolicy) } else { @() }
+            PolicyStatusOverview = if ($Phase4Data.ContainsKey('PolicyStatusOverview')) { @($Phase4Data.PolicyStatusOverview) } else { @() }
+        }
+    }
+
+    if ($null -ne $AssignmentAnalysis) {
+        $reportData['AssignmentAnalysis'] = [ordered]@{
+            Summary = if ($AssignmentAnalysis.ContainsKey('Summary')) { $AssignmentAnalysis.Summary } else { @{} }
+            PolicyAssignmentSummary = if ($AssignmentAnalysis.ContainsKey('PolicyAssignmentSummary')) { @($AssignmentAnalysis.PolicyAssignmentSummary) } else { @() }
+            UnassignedPolicies = if ($AssignmentAnalysis.ContainsKey('UnassignedPolicies')) { @($AssignmentAnalysis.UnassignedPolicies) } else { @() }
+            PotentiallyDeadPolicies = if ($AssignmentAnalysis.ContainsKey('PotentiallyDeadPolicies')) { @($AssignmentAnalysis.PotentiallyDeadPolicies) } else { @() }
+        }
+    }
+
     # Findings sections (optional — only present when findings engine ran)
     if ($null -ne $Findings -and $Findings.Count -gt 0) {
         # Executive summary — top 3 findings by severity
@@ -556,6 +668,10 @@ Export-ModuleMember -Function @(
     'Export-DeviceInventoryCsv',
     'Export-EnrollmentCsv',
     'Export-AppInventoryCsv',
+    'Export-AppInstallStatusAggregateCsv',
+    'Export-DeviceAssignmentStatusByConfigurationPolicyCsv',
+    'Export-PolicyStatusOverviewCsv',
+    'Export-PolicyAssignmentSummaryCsv',
     'Export-SettingsConflictsCsv',
     'Export-ReportData',
     'Get-MaturityScore'

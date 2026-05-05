@@ -43,24 +43,32 @@ Phase 1 is implemented in the current codebase.
    - Extend `Invoke-IbaGraphRequest` beyond GET to support JSON-body POST calls.
    - This is a prerequisite for Phase 4 async reporting.
 
-### Phase 4 (Advanced Reporting) - Pending
+### Phase 4 (Advanced Reporting) - In Progress
 1. Async report export system
-   - Add `IntuneReportExporter.psm1` based on Graph reporting API patterns.
-   - Parameterize temp paths and ensure Function-compatible execution.
+   - Added `Modules/IntuneReportExporter.psm1` with async export job POST/poll/download flow.
+   - Temp artifact path is parameterized and cleaned up after import.
 2. Policy deployment status + app install reporting
-   - Surface per-policy status counts and failed app install telemetry.
+   - Added aggregate-only app install export path (`AppInstallStatusAggregate`) and policy assignment status export path.
+   - Device-level failed install details (`DeviceAppInstallationStatusReport`) are explicitly deferred to Phase 4.1.
 3. Policy assignment analysis
-   - Add assignment target analysis and summary (including group/filter resolution).
-   - Enable findings such as unassigned/dead policies.
+   - Added `Modules/AssignmentAnalysis.psm1` to resolve assignment targets and flag unassigned/potentially-dead policies.
+   - Added additive CSV/JSON export sections and finding triggers tied to Phase 4 metrics.
+4. Advanced HTML analysis sections
+   - Extended `Modules/HtmlReportGenerator.psm1` with four collapsible Phase 4 analysis sections:
+     - `AllPolicyStatusOverview`
+     - `AllPolicyAssignmentSummary`
+     - `AllDeviceAssignmentStatusByConfigurationPolicy`
+     - `AppInstallStatusAggregateSummary`
+   - Added in-report sorting and per-section filters for requested columns.
+   - Added color-coded row states and a 500-row render cap per advanced section.
 
 ## Immediate Next Engineering Priorities
 1. Execute Robin merge Phase 3:
    - HTML report generation module + switch.
    - Add POST support to `GraphAPI.psm1`.
-2. Execute Robin merge Phase 4:
-   - Async report export integration.
-   - Policy deployment/app install reporting.
-   - Policy assignment analysis and related findings.
+2. Finalize Robin merge Phase 4:
+   - Validate advanced report exports in a tenant run and tune column mappings.
+   - Validate assignment analysis false-positive rate and adjust conservative detection rules if needed.
 3. Continue Sprint 9 logger abstraction (`Logger.psm1`) and replacement of high-value `Write-Host` usage.
 4. Build test harness for normalization/comparison/enrichment core functions (Sprint 10 kickoff).
 5. Keep Sprint 8 Word report generation in backlog until Robin merge phases are completed.
