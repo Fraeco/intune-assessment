@@ -58,9 +58,9 @@ function Connect-BaselineTenant {
         throw "Auth not initialised. Call Initialize-AuthConfig before connecting."
     }
 
-    Write-Host "  Connecting to baseline tenant ($($script:AppConfig['BaselineTenantId']))..." -ForegroundColor DarkCyan
+    Write-IbaLog -Level Info -Message "  Connecting to baseline tenant ($($script:AppConfig['BaselineTenantId']))..." -ForegroundColor DarkCyan
     $token = Get-GraphToken -TenantId $script:AppConfig['BaselineTenantId']
-    Write-Host "  Connected to baseline tenant." -ForegroundColor Green
+    Write-IbaLog -Level Info -Message "  Connected to baseline tenant." -ForegroundColor Green
     return $token
 }
 
@@ -85,9 +85,9 @@ function Connect-CustomerTenant {
         throw "Auth not initialised. Call Initialize-AuthConfig before connecting."
     }
 
-    Write-Host "  Connecting to customer tenant ($TenantId)..." -ForegroundColor DarkCyan
+    Write-IbaLog -Level Info -Message "  Connecting to customer tenant ($TenantId)..." -ForegroundColor DarkCyan
     $token = Get-GraphToken -TenantId $TenantId
-    Write-Host "  Connected to customer tenant." -ForegroundColor Green
+    Write-IbaLog -Level Info -Message "  Connected to customer tenant." -ForegroundColor Green
     return $token
 }
 

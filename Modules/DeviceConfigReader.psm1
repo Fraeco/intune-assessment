@@ -63,9 +63,9 @@ function Get-DeviceConfigPolicies {
         [string[]]             $PolicyFilter = @()
     )
 
-    Write-Host "    Fetching Device Configuration profile list..." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "    Fetching Device Configuration profile list..."
     $profiles = Get-GraphPagedResults -Uri "$BaseUrl/deviceManagement/deviceConfigurations" -Token $Token
-    Write-Host "    Found $($profiles.Count) Device Configuration profiles." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "    Found $($profiles.Count) Device Configuration profiles."
 
     if ($PolicyFilter.Count -gt 0) {
         $before   = $profiles.Count
@@ -73,7 +73,7 @@ function Get-DeviceConfigPolicies {
             $name = $_.displayName
             $PolicyFilter | Where-Object { $name -like $_ }
         })
-        Write-Host "    Policy filter applied: $before → $($profiles.Count) profiles." -ForegroundColor DarkGray
+        Write-IbaLog -Level Debug -Message "    Policy filter applied: $before -> $($profiles.Count) profiles."
     }
 
     $allSettings = [System.Collections.Generic.List[hashtable]]::new()
@@ -81,7 +81,7 @@ function Get-DeviceConfigPolicies {
 
     foreach ($profile in $profiles) {
         $i++
-        Write-Progress `
+        Write-IbaProgress `
             -Activity        'Reading Device Configuration' `
             -Status          "[$i/$($profiles.Count)] $($profile.displayName)" `
             -PercentComplete ([Math]::Round($i / $profiles.Count * 100))
@@ -102,8 +102,8 @@ function Get-DeviceConfigPolicies {
         foreach ($row in @($rows)) { if ($null -ne $row) { $allSettings.Add($row) } }
     }
 
-    Write-Progress -Activity 'Reading Device Configuration' -Completed
-    Write-Host "    Normalised $($allSettings.Count) settings from $($profiles.Count) profiles." -ForegroundColor DarkGray
+    Write-IbaProgress -Activity 'Reading Device Configuration' -Completed
+    Write-IbaLog -Level Debug -Message "    Normalised $($allSettings.Count) settings from $($profiles.Count) profiles."
 
     return $allSettings
 }

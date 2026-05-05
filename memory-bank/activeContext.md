@@ -15,7 +15,7 @@ From the imported roadmap:
 - Sprint 8 (Word report generation) moved to backlog
 - Sprint 9 target: logging abstraction + Azure Function prep
 - Sprint 10 target: tests + CI/CD
-- Logging abstraction is now started: `Logger.psm1` introduced and high-traffic paths migrated; rollout to remaining modules is still pending
+- Logging abstraction rollout is complete across modules: business modules now use `Write-IbaLog` / `Write-IbaProgress`; `Logger.psm1` remains the single console/progress owner
 
 ## Robin Merge Plan Status
 Phase 1 is implemented in the current codebase.
@@ -69,8 +69,8 @@ Phase 1 is implemented in the current codebase.
    - Validate advanced report exports in a tenant run and tune column mappings.
    - Validate assignment analysis false-positive rate and adjust conservative detection rules if needed.
 2. Continue Sprint 9 logger abstraction rollout:
-   - Migrate remaining modules from direct `Write-Host`/`Write-Progress` to `Write-IbaLog`/`Write-IbaProgress`.
    - Add non-interactive/structured logging mode coverage to improve Function portability.
+   - Validate level/verbosity behavior parity in tenant runs.
 3. Build test harness for normalization/comparison/enrichment core functions (Sprint 10 kickoff).
 4. Keep Sprint 8 Word report generation in backlog until Robin merge phases are completed.
 

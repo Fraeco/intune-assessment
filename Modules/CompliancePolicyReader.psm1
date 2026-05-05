@@ -67,9 +67,9 @@ function Get-CompliancePolicies {
         [string[]]             $PolicyFilter = @()
     )
 
-    Write-Host "    Fetching Compliance Policy list..." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "    Fetching Compliance Policy list..."
     $policies = Get-GraphPagedResults -Uri "$BaseUrl/deviceManagement/deviceCompliancePolicies" -Token $Token
-    Write-Host "    Found $($policies.Count) Compliance Policies." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "    Found $($policies.Count) Compliance Policies."
 
     if ($PolicyFilter.Count -gt 0) {
         $before   = $policies.Count
@@ -77,7 +77,7 @@ function Get-CompliancePolicies {
             $name = $_.displayName
             $PolicyFilter | Where-Object { $name -like $_ }
         })
-        Write-Host "    Policy filter applied: $before → $($policies.Count) policies." -ForegroundColor DarkGray
+        Write-IbaLog -Level Debug -Message "    Policy filter applied: $before -> $($policies.Count) policies."
     }
 
     $allSettings = [System.Collections.Generic.List[hashtable]]::new()
@@ -85,7 +85,7 @@ function Get-CompliancePolicies {
 
     foreach ($policy in $policies) {
         $i++
-        Write-Progress `
+        Write-IbaProgress `
             -Activity        'Reading Compliance Policies' `
             -Status          "[$i/$($policies.Count)] $($policy.displayName)" `
             -PercentComplete ([Math]::Round($i / $policies.Count * 100))
@@ -106,8 +106,8 @@ function Get-CompliancePolicies {
         foreach ($row in @($rows)) { if ($null -ne $row) { $allSettings.Add($row) } }
     }
 
-    Write-Progress -Activity 'Reading Compliance Policies' -Completed
-    Write-Host "    Normalised $($allSettings.Count) settings from $($policies.Count) policies." -ForegroundColor DarkGray
+    Write-IbaProgress -Activity 'Reading Compliance Policies' -Completed
+    Write-IbaLog -Level Debug -Message "    Normalised $($allSettings.Count) settings from $($policies.Count) policies."
 
     return $allSettings
 }

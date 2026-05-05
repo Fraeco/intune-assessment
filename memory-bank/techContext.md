@@ -42,7 +42,7 @@ Required Graph permissions include:
 - `TimeoutSec` support for slow endpoints (Autopilot uses elevated timeout)
 - Cache-first iterative workflow for baseline and definition metadata
 - OS lifecycle enrichment uses Graph-preferred, static-fallback sourcing to keep output resilient when lifecycle endpoints are unavailable
-- Sprint 9 logging abstraction has started (`Logger.psm1`) with incremental migration from direct console writes
+- Sprint 9 logging abstraction rollout is complete across modules with centralized wrappers in `Logger.psm1`
 
 ## Portability Constraints (Function App Target)
 - Avoid interactive UX dependencies

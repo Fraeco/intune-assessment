@@ -50,7 +50,7 @@ function Get-EnrollmentAnalysis {
 function Get-EnrollmentConfigs {
     param([string]$Token, [string]$BaseUrl)
 
-    Write-Host "    Fetching enrollment configurations..." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "    Fetching enrollment configurations..."
     $configs = $null
     try {
         $configs = Get-GraphPagedResults `
@@ -65,7 +65,7 @@ function Get-EnrollmentConfigs {
         throw
     }
 
-    Write-Host "    Found $($configs.Count) enrollment configurations." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "    Found $($configs.Count) enrollment configurations."
 
     $results = [System.Collections.Generic.List[hashtable]]::new()
     foreach ($c in $configs) {
@@ -93,7 +93,7 @@ function Get-EnrollmentConfigs {
 function Get-AutopilotDevices {
     param([string]$Token, [string]$BaseUrl)
 
-    Write-Host "    Fetching Autopilot device identities..." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "    Fetching Autopilot device identities..."
     $devices = $null
     try {
         $devices = Get-GraphPagedResults `
@@ -109,7 +109,7 @@ function Get-AutopilotDevices {
         throw
     }
 
-    Write-Host "    Found $($devices.Count) Autopilot devices." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "    Found $($devices.Count) Autopilot devices."
 
     $results = [System.Collections.Generic.List[hashtable]]::new()
     foreach ($d in $devices) {

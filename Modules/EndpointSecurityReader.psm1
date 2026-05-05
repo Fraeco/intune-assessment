@@ -54,9 +54,9 @@ function Get-EndpointSecurityPolicies {
         [string[]]             $PolicyFilter = @()
     )
 
-    Write-Host "    Fetching Endpoint Security intent list..." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "    Fetching Endpoint Security intent list..."
     $intents = Get-GraphPagedResults -Uri "$BaseUrl/deviceManagement/intents" -Token $Token
-    Write-Host "    Found $($intents.Count) Endpoint Security intents." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "    Found $($intents.Count) Endpoint Security intents."
 
     if ($PolicyFilter.Count -gt 0) {
         $before  = $intents.Count
@@ -64,7 +64,7 @@ function Get-EndpointSecurityPolicies {
             $name = $_.displayName
             $PolicyFilter | Where-Object { $name -like $_ }
         })
-        Write-Host "    Policy filter applied: $before → $($intents.Count) intents." -ForegroundColor DarkGray
+        Write-IbaLog -Level Debug -Message "    Policy filter applied: $before -> $($intents.Count) intents."
     }
 
     $allSettings = [System.Collections.Generic.List[hashtable]]::new()
@@ -72,7 +72,7 @@ function Get-EndpointSecurityPolicies {
 
     foreach ($intent in $intents) {
         $i++
-        Write-Progress `
+        Write-IbaProgress `
             -Activity        'Reading Endpoint Security' `
             -Status          "[$i/$($intents.Count)] $($intent.displayName)" `
             -PercentComplete ([Math]::Round($i / $intents.Count * 100))
@@ -96,8 +96,8 @@ function Get-EndpointSecurityPolicies {
         }
     }
 
-    Write-Progress -Activity 'Reading Endpoint Security' -Completed
-    Write-Host "    Normalised $($allSettings.Count) settings from $($intents.Count) intents." -ForegroundColor DarkGray
+    Write-IbaProgress -Activity 'Reading Endpoint Security' -Completed
+    Write-IbaLog -Level Debug -Message "    Normalised $($allSettings.Count) settings from $($intents.Count) intents."
 
     return $allSettings
 }

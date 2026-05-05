@@ -34,7 +34,7 @@ function Get-DeviceInventory {
 
     $selectFields = 'id,deviceName,operatingSystem,osVersion,complianceState,lastSyncDateTime,enrolledDateTime,managementAgent,deviceEnrollmentType,model,manufacturer,serialNumber,userPrincipalName'
 
-    Write-Host "    Fetching managed device inventory..." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "    Fetching managed device inventory..."
     $devices = $null
     try {
         $devices = Get-GraphPagedResults `
@@ -49,7 +49,7 @@ function Get-DeviceInventory {
         throw
     }
 
-    Write-Host "    Found $($devices.Count) managed devices." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "    Found $($devices.Count) managed devices."
 
     $results = [System.Collections.Generic.List[hashtable]]::new()
     foreach ($d in $devices) {

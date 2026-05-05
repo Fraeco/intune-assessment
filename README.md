@@ -193,6 +193,7 @@ Exports\                       — Output files (generated, not committed)
 - Domain mapping in `Config\DomainMapping.json` drives report categorization across 5 assessment domains: Endpoint Security, Device Management, Compliance & Governance, Application Lifecycle, Operations & Monitoring.
 - Baseline policy filters are baked into the cache; use `-RefreshBaseline` if filters change.
 - Baseline auth token acquisition in `Auth.psm1` uses a 60-second timeout to avoid indefinite hangs when Entra connectivity is degraded.
+- Logging is centralized via `Modules\Logger.psm1`; business modules and orchestrator emit through `Write-IbaLog` / `Write-IbaProgress`.
 - New Graph API permissions (`DeviceManagementServiceConfig.Read.All`, `DeviceManagementApps.Read.All`) must be granted by the customer admin before inventory collection will succeed. Missing permissions produce a warning and an empty inventory, not a fatal error.
 - OS lifecycle enrichment is additive and backward compatible: existing inventory fields remain unchanged, while `OsFamily`, `OsRelease`, `OsBuild`, `OsSupportState`, `OsEndOfServiceDate`, and `OsSource` are appended.
 - `Invoke-IbaGraphRequest` in `Modules\GraphAPI.psm1` now supports optional JSON request body and additional headers to support Phase 4 async reporting API calls.

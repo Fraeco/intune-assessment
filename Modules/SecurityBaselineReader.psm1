@@ -63,7 +63,7 @@ function Get-SecurityBaselinePolicies {
     )
 
     # Step 1 — Discover Security Baseline templates
-    Write-Host "    Discovering Security Baseline templates..." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "    Discovering Security Baseline templates..."
     $sbTemplates = $null
     try {
         $sbTemplates = Get-GraphPagedResults `
@@ -76,7 +76,7 @@ function Get-SecurityBaselinePolicies {
     }
 
     if ($sbTemplates.Count -eq 0) {
-        Write-Host "    No Security Baseline templates found." -ForegroundColor DarkGray
+        Write-IbaLog -Level Debug -Message "    No Security Baseline templates found."
         return [System.Collections.Generic.List[hashtable]]::new()
     }
 
@@ -84,15 +84,15 @@ function Get-SecurityBaselinePolicies {
     foreach ($tmpl in $sbTemplates) {
         if ($tmpl.id) { [void]$sbTemplateIds.Add($tmpl.id) }
     }
-    Write-Host "    Found $($sbTemplateIds.Count) Security Baseline templates." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "    Found $($sbTemplateIds.Count) Security Baseline templates."
 
     # Step 2 — Fetch all intents, filter to those referencing a SB template
-    Write-Host "    Fetching intents for Security Baselines..." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "    Fetching intents for Security Baselines..."
     $allIntents = Get-GraphPagedResults -Uri "$BaseUrl/deviceManagement/intents" -Token $Token
     $intents = @($allIntents | Where-Object {
         $_.PSObject.Properties['templateId'] -and $sbTemplateIds.Contains($_.templateId)
     })
-    Write-Host "    Found $($intents.Count) Security Baseline intents." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "    Found $($intents.Count) Security Baseline intents."
 
     if ($PolicyFilter.Count -gt 0) {
         $before  = $intents.Count
@@ -100,7 +100,7 @@ function Get-SecurityBaselinePolicies {
             $name = $_.displayName
             $PolicyFilter | Where-Object { $name -like $_ }
         })
-        Write-Host "    Policy filter applied: $before → $($intents.Count) intents." -ForegroundColor DarkGray
+        Write-IbaLog -Level Debug -Message "    Policy filter applied: $before -> $($intents.Count) intents."
     }
 
     $allSettings = [System.Collections.Generic.List[hashtable]]::new()
@@ -108,7 +108,7 @@ function Get-SecurityBaselinePolicies {
 
     foreach ($intent in $intents) {
         $i++
-        Write-Progress `
+        Write-IbaProgress `
             -Activity        'Reading Security Baselines' `
             -Status          "[$i/$($intents.Count)] $($intent.displayName)" `
             -PercentComplete ([Math]::Round($i / $intents.Count * 100))
@@ -132,8 +132,8 @@ function Get-SecurityBaselinePolicies {
         }
     }
 
-    Write-Progress -Activity 'Reading Security Baselines' -Completed
-    Write-Host "    Normalised $($allSettings.Count) settings from $($intents.Count) intents." -ForegroundColor DarkGray
+    Write-IbaProgress -Activity 'Reading Security Baselines' -Completed
+    Write-IbaLog -Level Debug -Message "    Normalised $($allSettings.Count) settings from $($intents.Count) intents."
 
     return $allSettings
 }

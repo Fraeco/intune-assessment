@@ -56,9 +56,9 @@ function Get-AdminTemplatePolicies {
         [string[]]             $PolicyFilter = @()
     )
 
-    Write-Host "    Fetching Admin Template policy list..." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "    Fetching Admin Template policy list..."
     $policies = Get-GraphPagedResults -Uri "$BaseUrl/deviceManagement/groupPolicyConfigurations" -Token $Token
-    Write-Host "    Found $($policies.Count) Admin Template policies." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "    Found $($policies.Count) Admin Template policies."
 
     if ($PolicyFilter.Count -gt 0) {
         $before   = $policies.Count
@@ -66,7 +66,7 @@ function Get-AdminTemplatePolicies {
             $name = $_.displayName
             $PolicyFilter | Where-Object { $name -like $_ }
         })
-        Write-Host "    Policy filter applied: $before → $($policies.Count) policies." -ForegroundColor DarkGray
+        Write-IbaLog -Level Debug -Message "    Policy filter applied: $before -> $($policies.Count) policies."
     }
 
     $allSettings = [System.Collections.Generic.List[hashtable]]::new()
@@ -74,7 +74,7 @@ function Get-AdminTemplatePolicies {
 
     foreach ($policy in $policies) {
         $i++
-        Write-Progress `
+        Write-IbaProgress `
             -Activity        'Reading Admin Templates' `
             -Status          "[$i/$($policies.Count)] $($policy.displayName)" `
             -PercentComplete ([Math]::Round($i / $policies.Count * 100))
@@ -134,8 +134,8 @@ function Get-AdminTemplatePolicies {
         }
     }
 
-    Write-Progress -Activity 'Reading Admin Templates' -Completed
-    Write-Host "    Normalised $($allSettings.Count) settings from $($policies.Count) policies." -ForegroundColor DarkGray
+    Write-IbaProgress -Activity 'Reading Admin Templates' -Completed
+    Write-IbaLog -Level Debug -Message "    Normalised $($allSettings.Count) settings from $($policies.Count) policies."
 
     return $allSettings
 }

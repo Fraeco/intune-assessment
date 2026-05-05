@@ -33,10 +33,13 @@ Consultants need a fast and consistent way to assess a customer Intune tenant ag
   - Async reporting reliability and schema resilience validation
   - Deployment/app install status verification in tenant-scale runs
   - Assignment analysis false-positive tuning and reporting UX refinement
-- Logging abstraction and Function-first execution model (Sprint 9)
+- Logging abstraction hardening (Sprint 9):
+  - Complete logger rollout is now in place across modules
+  - Structured/non-interactive logging mode validation remains
 - Automated testing and CI/CD (Sprint 10)
 - Word report generation from template (Sprint 8, backlog)
 
 ## Recently Delivered Value
 - Phase 2 complete: multi-policy settings conflict data deconcatenated to `SettingsConflicts.csv` (one row per contributing policy); `ReportData.json` exposes unique-setting counts plus `DetailRowCount`; `duplicate_coverage` counts unique baseline-scoped conflicting settings
 - Phase 3 complete: self-contained HTML reporting (`HtmlReportGenerator.psm1`, `-GenerateHtmlReport`) plus Graph helper POST/body/header support (`Invoke-IbaGraphRequest`) delivered and tested
+- Sprint 9 logger rollout completed across modules (`Write-IbaLog`/`Write-IbaProgress`), removing direct console calls from business modules

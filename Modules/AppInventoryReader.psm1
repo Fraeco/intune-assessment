@@ -33,7 +33,7 @@ function Get-AppInventory {
         [Parameter(Mandatory)] [string]$BaseUrl
     )
 
-    Write-Host "    Fetching mobile app inventory..." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "    Fetching mobile app inventory..."
     $apps = $null
     try {
         $apps = @(Get-GraphPagedResults `
@@ -48,7 +48,7 @@ function Get-AppInventory {
         throw
     }
 
-    Write-Host "    Found $($apps.Count) apps. Fetching assignments..." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "    Found $($apps.Count) apps. Fetching assignments..."
 
     $results = [System.Collections.Generic.List[hashtable]]::new()
     $i = 0
@@ -56,7 +56,7 @@ function Get-AppInventory {
     foreach ($app in $apps) {
         $i++
         if ($apps.Count -gt 0) {
-            Write-Progress `
+            Write-IbaProgress `
                 -Activity        'Reading App Assignments' `
                 -Status          "[$i/$($apps.Count)] $($app.displayName)" `
                 -PercentComplete ([Math]::Round($i / $apps.Count * 100))
@@ -82,8 +82,8 @@ function Get-AppInventory {
         })
     }
 
-    Write-Progress -Activity 'Reading App Assignments' -Completed
-    Write-Host "    Processed $($results.Count) apps with assignment data." -ForegroundColor DarkGray
+    Write-IbaProgress -Activity 'Reading App Assignments' -Completed
+    Write-IbaLog -Level Debug -Message "    Processed $($results.Count) apps with assignment data."
 
     return $results
 }

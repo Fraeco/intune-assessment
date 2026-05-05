@@ -78,5 +78,5 @@ Graph calls are routed through shared HTTP helpers in `GraphAPI.psm1`:
   - `Write-IbaLog` for leveled messages (`Debug`, `Info`, `Warn`, `Error`)
   - `Write-IbaProgress` for progress updates
   - `Set-IbaLogOptions` for runtime behavior toggles
-- Initial migration targets are the orchestrator and high-traffic readers/cache paths.
-- Transitional compatibility is maintained with `-UseLegacyConsoleLogging` while module rollout continues.
+- Logger migration is complete in business modules; direct `Write-Host`/`Write-Progress` is now isolated to `Logger.psm1`.
+- Transitional compatibility remains available via `-UseLegacyConsoleLogging`.

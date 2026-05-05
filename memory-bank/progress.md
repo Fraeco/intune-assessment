@@ -38,9 +38,9 @@
   - Extended findings engine/config with Phase 4 metric triggers.
   - Deferred to Phase 4.1: `DeviceAppInstallationStatusReport` (device-level failed app install detail).
   - Added advanced HTML Phase 4 sections with collapsible tables, requested column filters, sortable headers, color coding, and a 500-row cap per section.
-- Sprint 9 logging abstraction (initial implementation): implemented
+- Sprint 9 logging abstraction: rollout completed
   - Added `Modules/Logger.psm1` with `Write-IbaLog`, `Write-IbaProgress`, and `Set-IbaLogOptions`.
-  - Migrated high-traffic logging in `IntuneBaselineAssessment.ps1`, `PolicyReader.psm1`, and `DefinitionCache.psm1`.
+  - Migrated all business modules and orchestrator to centralized logging wrappers.
   - Added `-UseLegacyConsoleLogging` switch for transitional compatibility during rollout.
   - Fixed logger binding behavior for blank-line calls via `Write-IbaLog` accepting empty strings.
 
@@ -54,12 +54,12 @@
 
 ## Known Gaps / Risks
 - Report generation (Word template population) still not implemented
-- Logging migration is partial; several modules still use direct console output and need abstraction rollout
+- Structured/non-interactive logging mode behavior still needs explicit validation in Function-like runtime conditions
 - Testing coverage is limited; no full CI validation workflow yet
 - Secret hygiene remains an operational risk area if local config is mishandled
 
 ## Next Steps
 1. Validate and harden Robin Phase 4 advanced reporting integrations (tenant verification, schema drift handling, reliability tuning, and advanced HTML UX behavior).
-2. Continue logger migration across remaining modules and add structured/non-interactive logging mode validation.
+2. Validate structured/non-interactive logging mode behavior and verbosity parity in tenant runs.
 3. Add Pester tests for high-value core logic (including `Get-SettingsConflictSummary`) and wire lint/test in CI.
 4. Return to Sprint 8 Word report generation from backlog after Robin phases 3-4 are delivered.
