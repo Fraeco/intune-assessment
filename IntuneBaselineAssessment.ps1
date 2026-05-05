@@ -128,6 +128,7 @@ param(
     [switch]$EnableAssignmentAnalysis,
     [switch]$PreferGraphOsLifecycle = $true,
     [switch]$DisableGraphOsLifecycle,
+    [switch]$UseLegacyConsoleLogging,
 
     [ValidateSet('SettingsCatalog', 'EndpointSecurity', 'DeviceConfig', 'AdminTemplates', 'CompliancePolicy', 'SecurityBaseline')]
     [string[]]$PolicyTypes = @('SettingsCatalog', 'EndpointSecurity', 'DeviceConfig', 'AdminTemplates', 'CompliancePolicy', 'SecurityBaseline')
@@ -136,33 +137,39 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+$loggerModulePath = Join-Path (Join-Path $PSScriptRoot 'Modules') 'Logger.psm1'
+if (Test-Path $loggerModulePath) {
+    Import-Module $loggerModulePath -Force -DisableNameChecking
+    Set-IbaLogOptions -VerboseMode:($VerbosePreference -eq 'Continue') -MaskTenantIds:$true -UseLegacyConsoleLogging:$UseLegacyConsoleLogging
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Banner
 # ─────────────────────────────────────────────────────────────────────────────
-Write-Host ''
-Write-Host '╔══════════════════════════════════════════════════════╗' -ForegroundColor Cyan
-Write-Host '║    Intune Baseline Assessment Tool  v0.8.0           ║' -ForegroundColor Cyan
-Write-Host '║    +Bulk Definition Pre-Fetch                        ║' -ForegroundColor Cyan
-Write-Host '╚══════════════════════════════════════════════════════╝' -ForegroundColor Cyan
-Write-Host "  Customer      : $CustomerName" -ForegroundColor White
-Write-Host "  Tenant ID     : $CustomerTenantId" -ForegroundColor White
+Write-IbaLog -Level Info -Message ''
+Write-IbaLog -Level Info -Message '╔══════════════════════════════════════════════════════╗' -ForegroundColor Cyan
+Write-IbaLog -Level Info -Message '║    Intune Baseline Assessment Tool  v0.8.0           ║' -ForegroundColor Cyan
+Write-IbaLog -Level Info -Message '║    +Bulk Definition Pre-Fetch                        ║' -ForegroundColor Cyan
+Write-IbaLog -Level Info -Message '╚══════════════════════════════════════════════════════╝' -ForegroundColor Cyan
+Write-IbaLog -Level Info -Message "  Customer      : $CustomerName" -ForegroundColor White
+Write-IbaLog -Level Info -Message "  Tenant ID     : $CustomerTenantId" -ForegroundColor White
 $levelDisplay = switch ($BaselineLevel) {
     'All'   { 'All (L1-L4)' }
     'L1'    { 'L1' }
     default { "$BaselineLevel (cumulative: L1..$BaselineLevel)" }
 }
-Write-Host "  Baseline Level: $levelDisplay" -ForegroundColor White
+Write-IbaLog -Level Info -Message "  Baseline Level: $levelDisplay" -ForegroundColor White
 if ($BaselinePolicyFilter.Count -gt 0) {
-    Write-Host "  Policy Filter : $($BaselinePolicyFilter -join ', ')" -ForegroundColor White
+    Write-IbaLog -Level Info -Message "  Policy Filter : $($BaselinePolicyFilter -join ', ')" -ForegroundColor White
 }
-Write-Host ''
+Write-IbaLog -Level Info -Message ''
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Bootstrap — load modules
 # ─────────────────────────────────────────────────────────────────────────────
 $moduleRoot = Join-Path $PSScriptRoot 'Modules'
 
-foreach ($moduleName in @('Auth', 'GraphAPI', 'DefinitionCache', 'PolicyReader', 'EndpointSecurityReader', 'DeviceConfigReader', 'AdminTemplateReader', 'CompliancePolicyReader', 'SecurityBaselineReader', 'OsLifecycleProvider', 'DeviceInventoryReader', 'EnrollmentAnalyzer', 'AppInventoryReader', 'IntuneReportExporter', 'AssignmentAnalysis', 'Comparison', 'Enrichment', 'RecommendationEngine', 'Export', 'HtmlReportGenerator')) {
+foreach ($moduleName in @('Logger', 'Auth', 'GraphAPI', 'DefinitionCache', 'PolicyReader', 'EndpointSecurityReader', 'DeviceConfigReader', 'AdminTemplateReader', 'CompliancePolicyReader', 'SecurityBaselineReader', 'OsLifecycleProvider', 'DeviceInventoryReader', 'EnrollmentAnalyzer', 'AppInventoryReader', 'IntuneReportExporter', 'AssignmentAnalysis', 'Comparison', 'Enrichment', 'RecommendationEngine', 'Export', 'HtmlReportGenerator')) {
     $modulePath = Join-Path $moduleRoot "$moduleName.psm1"
     if (-not (Test-Path $modulePath)) {
         throw "Required module not found: $modulePath"
@@ -221,32 +228,32 @@ function Get-AllPolicySettings {
     $all = [System.Collections.Generic.List[hashtable]]::new()
 
     if ('SettingsCatalog' -in $Types) {
-        Write-Host "    [$Label] Settings Catalog..." -ForegroundColor DarkGray
+        Write-IbaLog -Level Debug -Message "    [$Label] Settings Catalog..."
         $sc = Get-SettingsCatalogPolicies -Token $Token -BaseUrl $BaseUrl -PolicyFilter $PolicyFilter
         foreach ($item in @($sc)) { if ($null -ne $item) { $all.Add($item) } }
     }
     if ('EndpointSecurity' -in $Types) {
-        Write-Host "    [$Label] Endpoint Security (intents)..." -ForegroundColor DarkGray
+        Write-IbaLog -Level Debug -Message "    [$Label] Endpoint Security (intents)..."
         $es = Get-EndpointSecurityPolicies -Token $Token -BaseUrl $BaseUrl -PolicyFilter $PolicyFilter
         foreach ($item in @($es)) { if ($null -ne $item) { $all.Add($item) } }
     }
     if ('DeviceConfig' -in $Types) {
-        Write-Host "    [$Label] Device Configuration..." -ForegroundColor DarkGray
+        Write-IbaLog -Level Debug -Message "    [$Label] Device Configuration..."
         $dc = Get-DeviceConfigPolicies -Token $Token -BaseUrl $BaseUrl -PolicyFilter $PolicyFilter
         foreach ($item in @($dc)) { if ($null -ne $item) { $all.Add($item) } }
     }
     if ('AdminTemplates' -in $Types) {
-        Write-Host "    [$Label] Admin Templates..." -ForegroundColor DarkGray
+        Write-IbaLog -Level Debug -Message "    [$Label] Admin Templates..."
         $at = Get-AdminTemplatePolicies -Token $Token -BaseUrl $BaseUrl -PolicyFilter $PolicyFilter
         foreach ($item in @($at)) { if ($null -ne $item) { $all.Add($item) } }
     }
     if ('CompliancePolicy' -in $Types) {
-        Write-Host "    [$Label] Compliance Policies..." -ForegroundColor DarkGray
+        Write-IbaLog -Level Debug -Message "    [$Label] Compliance Policies..."
         $cp = Get-CompliancePolicies -Token $Token -BaseUrl $BaseUrl -PolicyFilter $PolicyFilter
         foreach ($item in @($cp)) { if ($null -ne $item) { $all.Add($item) } }
     }
     if ('SecurityBaseline' -in $Types) {
-        Write-Host "    [$Label] Security Baselines..." -ForegroundColor DarkGray
+        Write-IbaLog -Level Debug -Message "    [$Label] Security Baselines..."
         $sb = Get-SecurityBaselinePolicies -Token $Token -BaseUrl $BaseUrl -PolicyFilter $PolicyFilter
         foreach ($item in @($sb)) { if ($null -ne $item) { $all.Add($item) } }
     }
@@ -293,7 +300,7 @@ function Select-BaselineByLevel {
 # from the baseline tenant once, so all readers can resolve them via O(1)
 # lookups instead of per-ID Graph requests.
 # ─────────────────────────────────────────────────────────────────────────────
-Write-Host '[0/5] Initialising definition cache' -ForegroundColor Yellow
+Write-IbaLog -Level Info -Message '[0/5] Initialising definition cache' -ForegroundColor Yellow
 
 $defCacheFile = if ($UseDefinitionsCache) { Join-Path $BaselinePath 'definitions-cache.json' } else { $null }
 $baselineToken = $null
@@ -313,21 +320,21 @@ Initialize-DefinitionCache `
     -SourceTenantId $configHash['BaselineTenantId']
 
 $cacheStats = Get-DefinitionCacheStats
-Write-Host ("  Ready ({0}): {1} SC defs, {2} categories, {3} ADMX defs." -f `
+Write-IbaLog -Level Info -Message ("  Ready ({0}): {1} SC defs, {2} categories, {3} ADMX defs." -f `
     $cacheStats.Source, $cacheStats.SettingsCatalogDefinitions, `
     $cacheStats.SettingsCatalogCategories, $cacheStats.AdmxDefinitions) -ForegroundColor Green
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Step 1 — Baseline settings (all policy types)
 # ─────────────────────────────────────────────────────────────────────────────
-Write-Host ''
-Write-Host '[1/5] Baseline tenant — all policy types' -ForegroundColor Yellow
+Write-IbaLog -Level Info -Message ''
+Write-IbaLog -Level Info -Message '[1/5] Baseline tenant — all policy types' -ForegroundColor Yellow
 
 $baselineCacheFile = Join-Path $BaselinePath 'baseline-cache.json'
 $baselineSettings  = $null
 
 if ($UseBaselineCache -and -not $RefreshBaseline -and (Test-Path $baselineCacheFile)) {
-    Write-Host "  Loading baseline from cache: $baselineCacheFile" -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "  Loading baseline from cache: $baselineCacheFile"
 
     $rawCache  = Get-Content $baselineCacheFile -Raw | ConvertFrom-Json
     $schemaVer = 1
@@ -399,11 +406,11 @@ if ($UseBaselineCache -and -not $RefreshBaseline -and (Test-Path $baselineCacheF
                        } else { $null }
 
         if ($cachedHash -ne $currentHash) {
-            Write-Host "  Domain mapping changed — re-applying enrichment to cached settings." -ForegroundColor Yellow
+            Write-IbaLog -Level Info -Message "  Domain mapping changed — re-applying enrichment to cached settings." -ForegroundColor Yellow
             Add-DomainEnrichment -Settings $baselineSettings
         }
 
-        Write-Host "  Loaded $($baselineSettings.Count) settings from cache." -ForegroundColor Green
+        Write-IbaLog -Level Info -Message "  Loaded $($baselineSettings.Count) settings from cache." -ForegroundColor Green
     }
 }
 
@@ -442,7 +449,7 @@ if ($null -eq $baselineSettings) {
         securityBaselines  = @($baselineSettings | Where-Object { $_.PolicyTemplate -eq 'Security Baseline' })
     }
     $cachePayload | ConvertTo-Json -Depth 10 | Set-Content $baselineCacheFile -Encoding UTF8
-    Write-Host ('  Baseline cached ({0} settings): {1}' -f $baselineSettings.Count, $baselineCacheFile) -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message ('  Baseline cached ({0} settings): {1}' -f $baselineSettings.Count, $baselineCacheFile)
 }
 
 # ── Apply BaselineLevel filter (post-load) ──────────────────────────────────
@@ -450,7 +457,7 @@ $preFilterCount = $baselineSettings.Count
 $baselineSettings = Select-BaselineByLevel -Settings $baselineSettings -Level $BaselineLevel
 
 if ($BaselineLevel -ne 'All') {
-    Write-Host ('  Level filter ({0} cumulative): {1} of {2} settings.' -f $BaselineLevel, $baselineSettings.Count, $preFilterCount) -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message ('  Level filter ({0} cumulative): {1} of {2} settings.' -f $BaselineLevel, $baselineSettings.Count, $preFilterCount)
 }
 if ($baselineSettings.Count -eq 0) {
     Write-Warning "No baseline settings match level '$BaselineLevel'. Check that baseline policies contain '-$BaselineLevel-' in their names."
@@ -459,8 +466,8 @@ if ($baselineSettings.Count -eq 0) {
 # ─────────────────────────────────────────────────────────────────────────────
 # Step 2 — Customer settings
 # ─────────────────────────────────────────────────────────────────────────────
-Write-Host ''
-Write-Host '[2/5] Customer tenant — policy settings' -ForegroundColor Yellow
+Write-IbaLog -Level Info -Message ''
+Write-IbaLog -Level Info -Message '[2/5] Customer tenant — policy settings' -ForegroundColor Yellow
 
 $customerToken    = Connect-CustomerTenant -TenantId $CustomerTenantId
 $customerSettings = Get-AllPolicySettings `
@@ -478,8 +485,8 @@ $enrollmentData   = $null
 $appInventory     = $null
 
 if (-not $SkipInventory) {
-    Write-Host ''
-    Write-Host '[3/5] Customer tenant — inventory collection' -ForegroundColor Yellow
+    Write-IbaLog -Level Info -Message ''
+    Write-IbaLog -Level Info -Message '[3/5] Customer tenant — inventory collection' -ForegroundColor Yellow
 
     $osDefinitionPath = Join-Path $ConfigPath 'OSDefinition.json'
     Initialize-OsLifecycleProvider `
@@ -498,11 +505,11 @@ if (-not $SkipInventory) {
     $invAp      = if ($null -ne $enrollmentData -and $null -ne $enrollmentData.AutopilotDevices) { $enrollmentData.AutopilotDevices.Count } else { 0 }
     $invApps    = if ($null -ne $appInventory) { $appInventory.Count } else { 0 }
 
-    Write-Host "    Collected: $invDevices devices, $invConfigs enrollment configs, $invAp Autopilot devices, $invApps apps." -ForegroundColor Green
+    Write-IbaLog -Level Info -Message "    Collected: $invDevices devices, $invConfigs enrollment configs, $invAp Autopilot devices, $invApps apps." -ForegroundColor Green
 }
 else {
-    Write-Host ''
-    Write-Host '[3/5] Customer tenant — inventory collection (skipped)' -ForegroundColor DarkGray
+    Write-IbaLog -Level Info -Message ''
+    Write-IbaLog -Level Debug -Message '[3/5] Customer tenant — inventory collection (skipped)'
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -512,19 +519,19 @@ $phase4Data = $null
 $assignmentAnalysis = $null
 
 if ($EnableAdvancedReporting -or $EnableAssignmentAnalysis) {
-    Write-Host ''
-    Write-Host '[4/6] Customer tenant — advanced reporting' -ForegroundColor Yellow
+    Write-IbaLog -Level Info -Message ''
+    Write-IbaLog -Level Info -Message '[4/6] Customer tenant — advanced reporting' -ForegroundColor Yellow
 }
 
 if ($EnableAdvancedReporting) {
     try {
-        Write-Host '  Collecting Intune advanced report exports...' -ForegroundColor DarkGray
+        Write-IbaLog -Level Debug -Message '  Collecting Intune advanced report exports...'
         $phase4Data = Get-IntuneAdvancedReportData `
             -Token $customerToken `
             -BaseUrl $baseUrl `
             -CustomerSettings $customerSettings `
             -TempPath $env:TEMP
-        Write-Host ('  Advanced reports collected: {0} policy status rows, {1} app aggregate rows.' -f $phase4Data.Summary.PolicyStatusRows, $phase4Data.Summary.AppCount) -ForegroundColor Green
+        Write-IbaLog -Level Info -Message ('  Advanced reports collected: {0} policy status rows, {1} app aggregate rows.' -f $phase4Data.Summary.PolicyStatusRows, $phase4Data.Summary.AppCount) -ForegroundColor Green
     }
     catch {
         Write-Warning ('  Advanced reporting failed and will be skipped: {0}' -f $_.Exception.Message)
@@ -534,9 +541,9 @@ if ($EnableAdvancedReporting) {
 
 if ($EnableAssignmentAnalysis) {
     try {
-        Write-Host '  Running assignment analysis...' -ForegroundColor DarkGray
+        Write-IbaLog -Level Debug -Message '  Running assignment analysis...'
         $assignmentAnalysis = Get-AssignmentAnalysis -Token $customerToken -BaseUrl $baseUrl
-        Write-Host ('  Assignment analysis complete: {0} unassigned, {1} potentially dead.' -f $assignmentAnalysis.Summary.UnassignedPolicyCount, $assignmentAnalysis.Summary.PotentiallyDeadPolicyCount) -ForegroundColor Green
+        Write-IbaLog -Level Info -Message ('  Assignment analysis complete: {0} unassigned, {1} potentially dead.' -f $assignmentAnalysis.Summary.UnassignedPolicyCount, $assignmentAnalysis.Summary.PotentiallyDeadPolicyCount) -ForegroundColor Green
     }
     catch {
         Write-Warning ('  Assignment analysis failed and will be skipped: {0}' -f $_.Exception.Message)
@@ -547,15 +554,15 @@ if ($EnableAssignmentAnalysis) {
 # ─────────────────────────────────────────────────────────────────────────────
 # Step 5 — Compare
 # ─────────────────────────────────────────────────────────────────────────────
-Write-Host ''
-Write-Host '[5/6] Comparing settings...' -ForegroundColor Yellow
+Write-IbaLog -Level Info -Message ''
+Write-IbaLog -Level Info -Message '[5/6] Comparing settings...' -ForegroundColor Yellow
 
 $comparisonResults = Compare-TenantSettings `
     -BaselineSettings $baselineSettings `
     -CustomerSettings $customerSettings
 
 # Multi-policy settings conflict summary (Phase 2.2)
-Write-Host '  Building settings conflict summary...' -ForegroundColor DarkGray
+Write-IbaLog -Level Debug -Message '  Building settings conflict summary...'
 $settingsConflicts = Get-SettingsConflictSummary `
     -BaselineSettings $baselineSettings `
     -CustomerSettings $customerSettings
@@ -583,14 +590,14 @@ $conflictUniqueKeys = @(
 $conflictUniqueCount = @($conflictUniqueKeys).Count
 
 if ($settingsConflicts.Count -gt 0) {
-    Write-Host ("  Conflict summary: {0} conflicting settings ({1} with baseline, {2} without); {3} detail rows" -f `
+    Write-IbaLog -Level Info -Message ("  Conflict summary: {0} conflicting settings ({1} with baseline, {2} without); {3} detail rows" -f `
         $conflictUniqueCount, @($conflictSettingKeysWith).Count, @($conflictSettingKeysWithout).Count, $settingsConflicts.Count) -ForegroundColor Yellow
 } else {
-    Write-Host '  Conflict summary: no multi-policy conflicts detected.' -ForegroundColor Green
+    Write-IbaLog -Level Info -Message '  Conflict summary: no multi-policy conflicts detected.' -ForegroundColor Green
 }
 
 # Evaluate findings
-Write-Host '  Evaluating findings...' -ForegroundColor DarkGray
+Write-IbaLog -Level Debug -Message '  Evaluating findings...'
 $findings = Get-Findings `
     -ComparisonResults $comparisonResults `
     -CustomerSettings  $customerSettings `
@@ -607,16 +614,16 @@ $fMedium   = @($findings | Where-Object { $_.Severity -eq 'Medium'   }).Count
 $fLow      = @($findings | Where-Object { $_.Severity -eq 'Low'      }).Count
 
 if ($findings.Count -gt 0) {
-    Write-Host "  $($findings.Count) findings: $fCritical Critical, $fHigh High, $fMedium Medium, $fLow Low" -ForegroundColor Yellow
+    Write-IbaLog -Level Info -Message "  $($findings.Count) findings: $fCritical Critical, $fHigh High, $fMedium Medium, $fLow Low" -ForegroundColor Yellow
 } else {
-    Write-Host '  No findings triggered.' -ForegroundColor Green
+    Write-IbaLog -Level Info -Message '  No findings triggered.' -ForegroundColor Green
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Step 6 — Export
 # ─────────────────────────────────────────────────────────────────────────────
-Write-Host ''
-Write-Host '[6/6] Exporting results...' -ForegroundColor Yellow
+Write-IbaLog -Level Info -Message ''
+Write-IbaLog -Level Info -Message '[6/6] Exporting results...' -ForegroundColor Yellow
 
 $csvPath = Export-DiffCsv `
     -Results       $comparisonResults `
@@ -624,7 +631,7 @@ $csvPath = Export-DiffCsv `
     -CustomerName  $CustomerName `
     -BaselineLevel $BaselineLevel
 
-Write-Host "  Diff CSV:       $csvPath" -ForegroundColor Green
+Write-IbaLog -Level Info -Message "  Diff CSV:       $csvPath" -ForegroundColor Green
 
 # Inventory CSVs
 if ($null -ne $deviceInventory -and $deviceInventory.Count -gt 0) {
@@ -633,7 +640,7 @@ if ($null -ne $deviceInventory -and $deviceInventory.Count -gt 0) {
         -OutputPath    $OutputPath `
         -CustomerName  $CustomerName `
         -BaselineLevel $BaselineLevel
-    Write-Host "  Device CSV:     $deviceCsvPath" -ForegroundColor Green
+    Write-IbaLog -Level Info -Message "  Device CSV:     $deviceCsvPath" -ForegroundColor Green
 }
 
 if ($null -ne $enrollmentData) {
@@ -642,8 +649,8 @@ if ($null -ne $enrollmentData) {
         -OutputPath     $OutputPath `
         -CustomerName   $CustomerName `
         -BaselineLevel  $BaselineLevel
-    Write-Host "  Enrollment CSV: $($enrollmentPaths.ConfigsCsv)" -ForegroundColor Green
-    Write-Host "  Autopilot CSV:  $($enrollmentPaths.AutopilotCsv)" -ForegroundColor Green
+    Write-IbaLog -Level Info -Message "  Enrollment CSV: $($enrollmentPaths.ConfigsCsv)" -ForegroundColor Green
+    Write-IbaLog -Level Info -Message "  Autopilot CSV:  $($enrollmentPaths.AutopilotCsv)" -ForegroundColor Green
 }
 
 if ($null -ne $appInventory -and $appInventory.Count -gt 0) {
@@ -652,7 +659,7 @@ if ($null -ne $appInventory -and $appInventory.Count -gt 0) {
         -OutputPath    $OutputPath `
         -CustomerName  $CustomerName `
         -BaselineLevel $BaselineLevel
-    Write-Host "  App CSV:        $appCsvPath" -ForegroundColor Green
+    Write-IbaLog -Level Info -Message "  App CSV:        $appCsvPath" -ForegroundColor Green
 }
 
 if ($null -ne $settingsConflicts -and $settingsConflicts.Count -gt 0) {
@@ -661,7 +668,7 @@ if ($null -ne $settingsConflicts -and $settingsConflicts.Count -gt 0) {
         -OutputPath    $OutputPath `
         -CustomerName  $CustomerName `
         -BaselineLevel $BaselineLevel
-    Write-Host "  Conflict CSV:   $conflictCsvPath" -ForegroundColor Green
+    Write-IbaLog -Level Info -Message "  Conflict CSV:   $conflictCsvPath" -ForegroundColor Green
 }
 
 if ($null -ne $phase4Data) {
@@ -671,7 +678,7 @@ if ($null -ne $phase4Data) {
             -OutputPath $OutputPath `
             -CustomerName $CustomerName `
             -BaselineLevel $BaselineLevel
-        Write-Host ('  App Install CSV: {0}' -f $appInstallCsvPath) -ForegroundColor Green
+        Write-IbaLog -Level Info -Message ('  App Install CSV: {0}' -f $appInstallCsvPath) -ForegroundColor Green
     }
     if ($phase4Data.ContainsKey('DeviceAssignmentStatusByConfigurationPolicy') -and $phase4Data.DeviceAssignmentStatusByConfigurationPolicy.Count -gt 0) {
         $policyStatusDetailCsv = Export-DeviceAssignmentStatusByConfigurationPolicyCsv `
@@ -679,7 +686,7 @@ if ($null -ne $phase4Data) {
             -OutputPath $OutputPath `
             -CustomerName $CustomerName `
             -BaselineLevel $BaselineLevel
-        Write-Host ('  Policy Status Detail CSV: {0}' -f $policyStatusDetailCsv) -ForegroundColor Green
+        Write-IbaLog -Level Info -Message ('  Policy Status Detail CSV: {0}' -f $policyStatusDetailCsv) -ForegroundColor Green
     }
     if ($phase4Data.ContainsKey('PolicyStatusOverview') -and $phase4Data.PolicyStatusOverview.Count -gt 0) {
         $policyStatusOverviewCsv = Export-PolicyStatusOverviewCsv `
@@ -687,7 +694,7 @@ if ($null -ne $phase4Data) {
             -OutputPath $OutputPath `
             -CustomerName $CustomerName `
             -BaselineLevel $BaselineLevel
-        Write-Host ('  Policy Status Overview CSV: {0}' -f $policyStatusOverviewCsv) -ForegroundColor Green
+        Write-IbaLog -Level Info -Message ('  Policy Status Overview CSV: {0}' -f $policyStatusOverviewCsv) -ForegroundColor Green
     }
 }
 
@@ -697,7 +704,7 @@ if ($null -ne $assignmentAnalysis -and $assignmentAnalysis.ContainsKey('PolicyAs
         -OutputPath $OutputPath `
         -CustomerName $CustomerName `
         -BaselineLevel $BaselineLevel
-    Write-Host ('  Assignment Summary CSV: {0}' -f $assignmentCsvPath) -ForegroundColor Green
+    Write-IbaLog -Level Info -Message ('  Assignment Summary CSV: {0}' -f $assignmentCsvPath) -ForegroundColor Green
 }
 
 if ($GenerateReportData) {
@@ -713,7 +720,7 @@ if ($GenerateReportData) {
         -SettingsConflicts $settingsConflicts `
         -Phase4Data        $phase4Data `
         -AssignmentAnalysis $assignmentAnalysis
-    Write-Host "  JSON: $jsonPath" -ForegroundColor Green
+    Write-IbaLog -Level Info -Message "  JSON: $jsonPath" -ForegroundColor Green
 }
 
 if ($GenerateHtmlReport) {
@@ -729,7 +736,7 @@ if ($GenerateHtmlReport) {
         -SettingsConflicts $settingsConflicts `
         -Phase4Data        $phase4Data `
         -AssignmentAnalysis $assignmentAnalysis
-    Write-Host "  HTML: $htmlPath" -ForegroundColor Green
+    Write-IbaLog -Level Info -Message "  HTML: $htmlPath" -ForegroundColor Green
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -746,22 +753,22 @@ $pConflict  = if ($total -gt 0) { $conflict  / $total } else { 0 }
 $pMissing   = if ($total -gt 0) { $missing   / $total } else { 0 }
 $pExtra     = if ($total -gt 0) { $extra     / $total } else { 0 }
 
-Write-Host ''
-Write-Host '═══════════════════════════════════════════════════════' -ForegroundColor Cyan
-Write-Host "  Intune Baseline Assessment — $CustomerName"           -ForegroundColor Cyan
-Write-Host "  Baseline Level  : $levelDisplay"                      -ForegroundColor Cyan
-Write-Host "  Total Settings  : $total"                             -ForegroundColor Cyan
-Write-Host '───────────────────────────────────────────────────────' -ForegroundColor Cyan
-Write-Host ("  Compliant : {0,5}  ({1,5:P1})" -f $compliant, $pCompliant) -ForegroundColor Green
-Write-Host ("  Conflict  : {0,5}  ({1,5:P1})" -f $conflict,  $pConflict)  -ForegroundColor Red
-Write-Host ("  Missing   : {0,5}  ({1,5:P1})" -f $missing,   $pMissing)   -ForegroundColor DarkYellow
-Write-Host ("  Extra     : {0,5}  ({1,5:P1})" -f $extra,     $pExtra)     -ForegroundColor Gray
+Write-IbaLog -Level Info -Message ''
+Write-IbaLog -Level Info -Message '═══════════════════════════════════════════════════════' -ForegroundColor Cyan
+Write-IbaLog -Level Info -Message "  Intune Baseline Assessment — $CustomerName"           -ForegroundColor Cyan
+Write-IbaLog -Level Info -Message "  Baseline Level  : $levelDisplay"                      -ForegroundColor Cyan
+Write-IbaLog -Level Info -Message "  Total Settings  : $total"                             -ForegroundColor Cyan
+Write-IbaLog -Level Info -Message '───────────────────────────────────────────────────────' -ForegroundColor Cyan
+Write-IbaLog -Level Info -Message ("  Compliant : {0,5}  ({1,5:P1})" -f $compliant, $pCompliant) -ForegroundColor Green
+Write-IbaLog -Level Info -Message ("  Conflict  : {0,5}  ({1,5:P1})" -f $conflict,  $pConflict)  -ForegroundColor Red
+Write-IbaLog -Level Info -Message ("  Missing   : {0,5}  ({1,5:P1})" -f $missing,   $pMissing)   -ForegroundColor DarkYellow
+Write-IbaLog -Level Info -Message ("  Extra     : {0,5}  ({1,5:P1})" -f $extra,     $pExtra)     -ForegroundColor Gray
 
 # Per-domain breakdown
 $domainGroups = @($comparisonResults | Where-Object { $_.BaselineDomain } | Group-Object BaselineDomain)
 if ($domainGroups.Count -gt 0) {
-    Write-Host '───────────────────────────────────────────────────────' -ForegroundColor Cyan
-    Write-Host '  By Domain:' -ForegroundColor Cyan
+    Write-IbaLog -Level Info -Message '───────────────────────────────────────────────────────' -ForegroundColor Cyan
+    Write-IbaLog -Level Info -Message '  By Domain:' -ForegroundColor Cyan
 
     foreach ($d in $domainGroups | Sort-Object Name) {
         $dc  = @($d.Group | Where-Object { $_.Result -eq 'Compliant' }).Count
@@ -776,16 +783,16 @@ if ($domainGroups.Count -gt 0) {
             4 { 'Cyan'       }
             5 { 'Green'      }
         }
-        Write-Host ("    {0,-32} Score {1}/5  [{2,3}% compliant, {3} settings]" -f `
+        Write-IbaLog -Level Info -Message ("    {0,-32} Score {1}/5  [{2,3}% compliant, {3} settings]" -f `
             $d.Name, $score, $pct, $dt) -ForegroundColor $scoreColor
     }
 }
 
 # Findings summary
 if ($findings.Count -gt 0) {
-    Write-Host '───────────────────────────────────────────────────────' -ForegroundColor Cyan
-    Write-Host '  Findings:' -ForegroundColor Cyan
-    Write-Host ("    Critical: {0}  High: {1}  Medium: {2}  Low: {3}" -f $fCritical, $fHigh, $fMedium, $fLow) -ForegroundColor White
+    Write-IbaLog -Level Info -Message '───────────────────────────────────────────────────────' -ForegroundColor Cyan
+    Write-IbaLog -Level Info -Message '  Findings:' -ForegroundColor Cyan
+    Write-IbaLog -Level Info -Message ("    Critical: {0}  High: {1}  Medium: {2}  Low: {3}" -f $fCritical, $fHigh, $fMedium, $fLow) -ForegroundColor White
     # Show top 3 findings
     $topFindings = @($findings | Select-Object -First 3)
     foreach ($f in $topFindings) {
@@ -795,26 +802,26 @@ if ($findings.Count -gt 0) {
             'Medium'   { 'Yellow'     }
             'Low'      { 'Gray'       }
         }
-        Write-Host ("    [{0}] {1}" -f $f.Severity, $f.FindingName) -ForegroundColor $sevColor
+        Write-IbaLog -Level Info -Message ("    [{0}] {1}" -f $f.Severity, $f.FindingName) -ForegroundColor $sevColor
     }
 }
 
 # Inventory summary
 if ($null -ne $deviceInventory -and $deviceInventory.Count -gt 0) {
-    Write-Host '───────────────────────────────────────────────────────' -ForegroundColor Cyan
-    Write-Host '  Inventory:' -ForegroundColor Cyan
+    Write-IbaLog -Level Info -Message '───────────────────────────────────────────────────────' -ForegroundColor Cyan
+    Write-IbaLog -Level Info -Message '  Inventory:' -ForegroundColor Cyan
     $compliantDevices = @($deviceInventory | Where-Object { $_.ComplianceState -eq 'compliant' }).Count
-    Write-Host "    Devices: $($deviceInventory.Count) total, $compliantDevices compliant" -ForegroundColor White
+    Write-IbaLog -Level Info -Message "    Devices: $($deviceInventory.Count) total, $compliantDevices compliant" -ForegroundColor White
     if ($null -ne $enrollmentData) {
-        Write-Host "    Autopilot: $($enrollmentData.AutopilotDevices.Count) registered" -ForegroundColor White
-        Write-Host "    Enrollment configs: $($enrollmentData.EnrollmentConfigs.Count)" -ForegroundColor White
+        Write-IbaLog -Level Info -Message "    Autopilot: $($enrollmentData.AutopilotDevices.Count) registered" -ForegroundColor White
+        Write-IbaLog -Level Info -Message "    Enrollment configs: $($enrollmentData.EnrollmentConfigs.Count)" -ForegroundColor White
     }
     if ($null -ne $appInventory -and $appInventory.Count -gt 0) {
         $assignedApps = @($appInventory | Where-Object { $_.IsAssigned -eq 'Yes' }).Count
-        Write-Host "    Apps: $($appInventory.Count) total, $assignedApps assigned" -ForegroundColor White
+        Write-IbaLog -Level Info -Message "    Apps: $($appInventory.Count) total, $assignedApps assigned" -ForegroundColor White
     }
 }
 
-Write-Host '═══════════════════════════════════════════════════════' -ForegroundColor Cyan
-Write-Host "  Output: $csvPath" -ForegroundColor Green
-Write-Host ''
+Write-IbaLog -Level Info -Message '═══════════════════════════════════════════════════════' -ForegroundColor Cyan
+Write-IbaLog -Level Info -Message "  Output: $csvPath" -ForegroundColor Green
+Write-IbaLog -Level Info -Message ''

@@ -122,6 +122,7 @@ Filter baseline policies and force cache refresh:
 | `SkipInventory` | switch | Skip device/enrollment/app inventory collection |
 | `EnableAdvancedReporting` | switch | Enable async Intune reports (`AppInstallStatusAggregate`, `DeviceAssignmentStatusByConfigurationPolicy`) |
 | `EnableAssignmentAnalysis` | switch | Analyze assignment targets and dead/unassigned policy signals |
+| `UseLegacyConsoleLogging` | switch | Keep legacy-style debug console output during logger migration rollout |
 | `PreferGraphOsLifecycle` | switch | Prefer Graph lifecycle source for OS metadata, with static fallback |
 | `DisableGraphOsLifecycle` | switch | Disable Graph lifecycle lookup and force static `Config\OSDefinition.json` |
 | `PolicyTypes` | string[] | Subset of policy types to compare (default: all 6) |
@@ -173,6 +174,7 @@ Modules\
   IntuneReportExporter.psm1    — Async report export jobs + normalization (Phase 4)
   AssignmentAnalysis.psm1      — Assignment target analysis and dead/unassigned detection
   OsLifecycleProvider.psm1     — OS lifecycle resolver (Graph-first, static fallback)
+  Logger.psm1                  — Centralized leveled logging and progress wrappers
   Comparison.psm1              — Diff engine (Compliant/Conflict/Missing/Extra)
   Enrichment.psm1              — Domain enrichment via DomainMapping.json
   Export.psm1                  — CSV and JSON output generation

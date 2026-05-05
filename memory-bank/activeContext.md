@@ -15,7 +15,7 @@ From the imported roadmap:
 - Sprint 8 (Word report generation) moved to backlog
 - Sprint 9 target: logging abstraction + Azure Function prep
 - Sprint 10 target: tests + CI/CD
-- High-priority quality concern persists: heavy `Write-Host` usage limits Function portability
+- Logging abstraction is now started: `Logger.psm1` introduced and high-traffic paths migrated; rollout to remaining modules is still pending
 
 ## Robin Merge Plan Status
 Phase 1 is implemented in the current codebase.
@@ -35,13 +35,15 @@ Phase 1 is implemented in the current codebase.
    - Refactored `Invoke-DuplicateCoverageFinding` in `Modules/RecommendationEngine.psm1` to consume the summary directly (filtered to `HasBaseline = true`).
    - Orchestrator emits a console summary line and threads the data through findings + exports.
 
-### Phase 3 (Visual Reporting) - Pending
-1. HTML report generation
-   - Add `HtmlReportGenerator.psm1` and optional `-GenerateHtmlReport` switch.
-   - Produce styled, self-contained HTML summary with safe encoding.
-2. POST support in Graph API helper
-   - Extend `Invoke-IbaGraphRequest` beyond GET to support JSON-body POST calls.
-   - This is a prerequisite for Phase 4 async reporting.
+### Phase 3 (Visual Reporting) - Complete
+1. HTML report generation - Implemented
+   - Added `HtmlReportGenerator.psm1` and optional `-GenerateHtmlReport` switch.
+   - Produces styled, self-contained HTML summary with safe encoding.
+   - Includes executive summary, domain overview, baseline policy overview, and detailed collapsible sections.
+   - Added text-based metric color coding for `Total`, `Compliant`, `Conflict`, and `Missing` in KPI cards and overview tables.
+2. POST support in Graph API helper - Implemented
+   - Extended `Invoke-IbaGraphRequest` beyond GET to support JSON-body POST calls and optional additional headers.
+   - Reused as prerequisite plumbing for async reporting work in Phase 4.
 
 ### Phase 4 (Advanced Reporting) - In Progress
 1. Async report export system
@@ -63,15 +65,14 @@ Phase 1 is implemented in the current codebase.
    - Added color-coded row states and a 500-row render cap per advanced section.
 
 ## Immediate Next Engineering Priorities
-1. Execute Robin merge Phase 3:
-   - HTML report generation module + switch.
-   - Add POST support to `GraphAPI.psm1`.
-2. Finalize Robin merge Phase 4:
+1. Finalize Robin merge Phase 4:
    - Validate advanced report exports in a tenant run and tune column mappings.
    - Validate assignment analysis false-positive rate and adjust conservative detection rules if needed.
-3. Continue Sprint 9 logger abstraction (`Logger.psm1`) and replacement of high-value `Write-Host` usage.
-4. Build test harness for normalization/comparison/enrichment core functions (Sprint 10 kickoff).
-5. Keep Sprint 8 Word report generation in backlog until Robin merge phases are completed.
+2. Continue Sprint 9 logger abstraction rollout:
+   - Migrate remaining modules from direct `Write-Host`/`Write-Progress` to `Write-IbaLog`/`Write-IbaProgress`.
+   - Add non-interactive/structured logging mode coverage to improve Function portability.
+3. Build test harness for normalization/comparison/enrichment core functions (Sprint 10 kickoff).
+4. Keep Sprint 8 Word report generation in backlog until Robin merge phases are completed.
 
 ## Operational Notes
 - Keep all new work Function-ready by default.

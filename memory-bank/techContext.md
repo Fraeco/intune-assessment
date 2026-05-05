@@ -24,6 +24,7 @@ Required Graph permissions include:
 - Generated runtime data:
   - `Baseline/` (cache files)
   - `Exports/` (CSV + JSON outputs)
+  - `debug-*.log` (temporary local debug traces; should remain uncommitted)
 
 ## Configuration Files
 - `Config/AppConfig.template.json` is committed template
@@ -41,12 +42,14 @@ Required Graph permissions include:
 - `TimeoutSec` support for slow endpoints (Autopilot uses elevated timeout)
 - Cache-first iterative workflow for baseline and definition metadata
 - OS lifecycle enrichment uses Graph-preferred, static-fallback sourcing to keep output resilient when lifecycle endpoints are unavailable
+- Sprint 9 logging abstraction has started (`Logger.psm1`) with incremental migration from direct console writes
 
 ## Portability Constraints (Function App Target)
 - Avoid interactive UX dependencies
 - Avoid hardcoded local paths
 - Prefer structured outputs over console-only text
 - Keep logic deterministic and parameter-driven
+- Prefer logger abstraction (`Write-IbaLog`) over direct `Write-Host` in new/modified modules
 
 ## Security Notes
 - Secrets must remain outside source control (`AppConfig.json` should never be committed)

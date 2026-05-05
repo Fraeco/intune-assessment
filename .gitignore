@@ -4,6 +4,7 @@ Config/AppConfig.json
 
 # ── Generated output ────────────────────────────────────────────────────────
 exports/
+debug-*.log
 Baseline/baseline-cache.json
 Baseline/definitions-cache.json
 

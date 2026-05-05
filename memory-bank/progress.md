@@ -26,9 +26,10 @@
 - Phase 2 (Quick Wins): implemented
   - OS definition + device compliance summary enrichment: implemented (Phase 2.1).
   - Standalone settings conflict detection summary for multi-policy overlap: implemented (Phase 2.2) — `Get-SettingsConflictSummary`, `Export-SettingsConflictsCsv`, `SettingsConflicts` section in `ReportData.json`, and `duplicate_coverage` finding refactored to consume it.
-- Phase 3 (Visual Reporting): pending
-  - HTML report generation module + switch.
-  - Graph API POST support as prerequisite for async report flow.
+- Phase 3 (Visual Reporting): completed and tested
+  - Added `HtmlReportGenerator.psm1` + `-GenerateHtmlReport` switch for self-contained assessment reports.
+  - Added Graph helper POST/body/header support in `Invoke-IbaGraphRequest`.
+  - Added baseline policy overview and text-based metric color coding (`Total`, `Compliant`, `Conflict`, `Missing`) in HTML report.
 - Phase 4 (Advanced Reporting): in progress
   - Added `IntuneReportExporter.psm1` for async report job submission, polling, artifact download, and CSV normalization.
   - Added aggregate report collectors for `AppInstallStatusAggregate` and `DeviceAssignmentStatusByConfigurationPolicy`.
@@ -37,6 +38,11 @@
   - Extended findings engine/config with Phase 4 metric triggers.
   - Deferred to Phase 4.1: `DeviceAppInstallationStatusReport` (device-level failed app install detail).
   - Added advanced HTML Phase 4 sections with collapsible tables, requested column filters, sortable headers, color coding, and a 500-row cap per section.
+- Sprint 9 logging abstraction (initial implementation): implemented
+  - Added `Modules/Logger.psm1` with `Write-IbaLog`, `Write-IbaProgress`, and `Set-IbaLogOptions`.
+  - Migrated high-traffic logging in `IntuneBaselineAssessment.ps1`, `PolicyReader.psm1`, and `DefinitionCache.psm1`.
+  - Added `-UseLegacyConsoleLogging` switch for transitional compatibility during rollout.
+  - Fixed logger binding behavior for blank-line calls via `Write-IbaLog` accepting empty strings.
 
 ## What Works
 - End-to-end assessment pipeline with baseline/customer comparison
@@ -48,13 +54,12 @@
 
 ## Known Gaps / Risks
 - Report generation (Word template population) still not implemented
-- Logging is console-heavy (`Write-Host`), reducing serverless portability
+- Logging migration is partial; several modules still use direct console output and need abstraction rollout
 - Testing coverage is limited; no full CI validation workflow yet
 - Secret hygiene remains an operational risk area if local config is mishandled
 
 ## Next Steps
-1. Implement Robin Phase 3 visual reporting foundation (HTML report module + Graph POST).
-2. Validate and harden Robin Phase 4 advanced reporting integrations (tenant verification, schema drift handling, reliability tuning, and advanced HTML UX behavior).
-3. Introduce central logger abstraction and begin replacing `Write-Host`.
-4. Add Pester tests for high-value core logic (including `Get-SettingsConflictSummary`) and wire lint/test in CI.
-5. Return to Sprint 8 Word report generation from backlog after Robin phases 3-4 are delivered.
+1. Validate and harden Robin Phase 4 advanced reporting integrations (tenant verification, schema drift handling, reliability tuning, and advanced HTML UX behavior).
+2. Continue logger migration across remaining modules and add structured/non-interactive logging mode validation.
+3. Add Pester tests for high-value core logic (including `Get-SettingsConflictSummary`) and wire lint/test in CI.
+4. Return to Sprint 8 Word report generation from backlog after Robin phases 3-4 are delivered.

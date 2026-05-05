@@ -72,3 +72,11 @@ Graph calls are routed through shared HTTP helpers in `GraphAPI.psm1`:
 - Paging support
 - Retry/backoff for transient failures and throttling
 - Configurable `TimeoutSec` for slow endpoints (e.g., Autopilot)
+
+## Logging Pattern (Sprint 9 kickoff)
+- `Logger.psm1` provides centralized log wrappers:
+  - `Write-IbaLog` for leveled messages (`Debug`, `Info`, `Warn`, `Error`)
+  - `Write-IbaProgress` for progress updates
+  - `Set-IbaLogOptions` for runtime behavior toggles
+- Initial migration targets are the orchestrator and high-traffic readers/cache paths.
+- Transitional compatibility is maintained with `-UseLegacyConsoleLogging` while module rollout continues.

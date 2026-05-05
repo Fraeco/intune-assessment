@@ -288,7 +288,7 @@ function Invoke-DefinitionBulkFetch {
 
     $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
-    Write-Host "  Bulk-fetching Settings Catalog definitions..." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "  Bulk-fetching Settings Catalog definitions..."
     try {
         $defs = Get-GraphPagedResults -Uri "$BaseUrl/deviceManagement/configurationSettings" -Token $Token
         foreach ($d in $defs) {
@@ -296,13 +296,13 @@ function Invoke-DefinitionBulkFetch {
                 $script:SettingsCatalogDefinitions[$d.id] = $d
             }
         }
-        Write-Host "    $($script:SettingsCatalogDefinitions.Count) Settings Catalog definitions cached." -ForegroundColor DarkGray
+        Write-IbaLog -Level Debug -Message "    $($script:SettingsCatalogDefinitions.Count) Settings Catalog definitions cached."
     }
     catch {
         Write-Warning "  Settings Catalog bulk fetch failed: $_. Readers will fall back to per-ID lookups."
     }
 
-    Write-Host "  Bulk-fetching Settings Catalog categories..." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "  Bulk-fetching Settings Catalog categories..."
     try {
         $cats = Get-GraphPagedResults -Uri "$BaseUrl/deviceManagement/configurationCategories" -Token $Token
         foreach ($c in $cats) {
@@ -310,13 +310,13 @@ function Invoke-DefinitionBulkFetch {
                 $script:SettingsCatalogCategories[$c.id] = $c
             }
         }
-        Write-Host "    $($script:SettingsCatalogCategories.Count) Settings Catalog categories cached." -ForegroundColor DarkGray
+        Write-IbaLog -Level Debug -Message "    $($script:SettingsCatalogCategories.Count) Settings Catalog categories cached."
     }
     catch {
         Write-Warning "  Settings Catalog category bulk fetch failed: $_. Readers will fall back to per-ID lookups."
     }
 
-    Write-Host "  Bulk-fetching Admin Template (ADMX) definitions..." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "  Bulk-fetching Admin Template (ADMX) definitions..."
     try {
         $admx = Get-GraphPagedResults -Uri "$BaseUrl/deviceManagement/groupPolicyDefinitions" -Token $Token
         foreach ($a in $admx) {
@@ -324,7 +324,7 @@ function Invoke-DefinitionBulkFetch {
                 $script:AdmxDefinitions[$a.id] = $a
             }
         }
-        Write-Host "    $($script:AdmxDefinitions.Count) ADMX definitions cached." -ForegroundColor DarkGray
+        Write-IbaLog -Level Debug -Message "    $($script:AdmxDefinitions.Count) ADMX definitions cached."
     }
     catch {
         Write-Warning "  ADMX bulk fetch failed: $_. AdminTemplateReader will fall back to per-ID lookups."
@@ -360,7 +360,7 @@ function Read-DefinitionCacheFile {
         [int]                  $MaxCacheAgeDays = 30
     )
 
-    Write-Host "  Loading definition cache from: $CacheFile" -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "  Loading definition cache from: $CacheFile"
     $raw = Get-Content $CacheFile -Raw | ConvertFrom-Json
 
     if (-not $raw.PSObject.Properties['meta']) {
@@ -379,7 +379,7 @@ function Read-DefinitionCacheFile {
             $cachedAt = [datetime]::Parse($raw.meta.cachedAt)
             $age = (Get-Date) - $cachedAt
             if ($age.TotalDays -gt $MaxCacheAgeDays) {
-                Write-Host "  Cache is $([Math]::Round($age.TotalDays, 1)) days old (TTL $MaxCacheAgeDays); refreshing." -ForegroundColor Yellow
+                Write-IbaLog -Level Info -Message "  Cache is $([Math]::Round($age.TotalDays, 1)) days old (TTL $MaxCacheAgeDays); refreshing." -ForegroundColor Yellow
                 return $false
             }
         }
@@ -434,7 +434,7 @@ function Read-DefinitionCacheFile {
         admxDefinitions             = $script:AdmxDefinitions.Count
     }
 
-    Write-Host "    Loaded from file: $($script:SettingsCatalogDefinitions.Count) defs, $($script:SettingsCatalogCategories.Count) cats, $($script:AdmxDefinitions.Count) ADMX defs." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "    Loaded from file: $($script:SettingsCatalogDefinitions.Count) defs, $($script:SettingsCatalogCategories.Count) cats, $($script:AdmxDefinitions.Count) ADMX defs."
     return $true
 }
 
@@ -478,7 +478,7 @@ function Write-DefinitionCacheFile {
     $payload | ConvertTo-Json -Depth 20 -Compress | Set-Content $tempFile -Encoding UTF8
     [System.IO.File]::Move($tempFile, $CacheFile, $true)
 
-    Write-Host "  Definition cache written: $CacheFile" -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "  Definition cache written: $CacheFile"
 }
 
 Export-ModuleMember -Function @(

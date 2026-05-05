@@ -56,10 +56,10 @@ function Get-SettingsCatalogPolicies {
         [string[]]             $PolicyFilter = @()
     )
 
-    Write-Host "    Fetching Settings Catalog policy list..." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "    Fetching Settings Catalog policy list..."
     $policiesUrl = "$BaseUrl/deviceManagement/configurationPolicies"
     $policies    = Get-GraphPagedResults -Uri $policiesUrl -Token $Token
-    Write-Host "    Found $($policies.Count) Settings Catalog policies." -ForegroundColor DarkGray
+    Write-IbaLog -Level Debug -Message "    Found $($policies.Count) Settings Catalog policies."
 
     # Apply name filter (client-side; Graph API does not support wildcard $filter on name)
     if ($PolicyFilter.Count -gt 0) {
@@ -68,7 +68,7 @@ function Get-SettingsCatalogPolicies {
             $name = $_.name
             $PolicyFilter | Where-Object { $name -like $_ }
         })
-        Write-Host "    Policy filter applied ($($PolicyFilter -join ', ')): $before → $($policies.Count) policies." -ForegroundColor DarkGray
+        Write-IbaLog -Level Debug -Message "    Policy filter applied ($($PolicyFilter -join ', ')): $before -> $($policies.Count) policies."
     }
 
     $allSettings = [System.Collections.Generic.List[hashtable]]::new()
@@ -77,7 +77,7 @@ function Get-SettingsCatalogPolicies {
     foreach ($policy in $policies) {
         $i++
         $pct = [Math]::Round($i / $policies.Count * 100)
-        Write-Progress `
+        Write-IbaProgress `
             -Activity        "Reading Settings Catalog" `
             -Status          "[$i/$($policies.Count)] $($policy.name)" `
             -PercentComplete $pct
@@ -97,8 +97,8 @@ function Get-SettingsCatalogPolicies {
         }
     }
 
-    Write-Progress -Activity "Reading Settings Catalog" -Completed
-    Write-Host "    Normalised $($allSettings.Count) settings from $($policies.Count) policies." -ForegroundColor DarkGray
+    Write-IbaProgress -Activity "Reading Settings Catalog" -Completed
+    Write-IbaLog -Level Debug -Message "    Normalised $($allSettings.Count) settings from $($policies.Count) policies."
 
     return $allSettings
 }
