@@ -20,7 +20,9 @@ hardened baseline** (OpenIntune L1–L4) and produces:
    devices, and deployed apps.
 3. An optional **ReportData.json** — aggregated scores, per-domain maturity,
    and findings, ready to drop into the Word report template.
-4. A **console summary** — at-a-glance compliance counts, per-domain maturity
+4. An optional **AssessmentReport.html** — self-contained executive summary +
+   collapsible detailed sections for quick sharing.
+5. A **console summary** — at-a-glance compliance counts, per-domain maturity
    score, and top findings.
 
 It reads from Microsoft Graph only — **it never makes changes to either
@@ -84,7 +86,8 @@ That's it — you are ready to run assessments.
 .\IntuneBaselineAssessment.ps1 `
     -CustomerTenantId "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" `
     -CustomerName "Contoso" `
-    -GenerateReportData
+    -GenerateReportData `
+    -GenerateHtmlReport
 ```
 
 This does the following:
@@ -93,7 +96,7 @@ This does the following:
 - `[2/5]` Fetches all policies from the customer tenant
 - `[3/5]` Collects device, enrollment, and app inventory from the customer
 - `[4/5]` Compares the two and evaluates findings
-- `[5/5]` Writes CSVs and `ReportData.json` to `Exports\`
+- `[5/5]` Writes CSVs and optional `ReportData.json` / `AssessmentReport.html` to `Exports\`
 
 Expect the first run to take **5–15 minutes** depending on the size of the
 customer tenant. Autopilot collection in particular can be slow.
@@ -106,7 +109,7 @@ Use `-UseBaselineCache` to skip the baseline fetch on subsequent runs:
 ```powershell
 .\IntuneBaselineAssessment.ps1 `
     -CustomerTenantId "<GUID>" -CustomerName "Contoso" `
-    -UseBaselineCache -GenerateReportData
+    -UseBaselineCache -GenerateReportData -GenerateHtmlReport
 ```
 
 The baseline cache only changes when eVri updates the hardened baseline. Use
@@ -169,6 +172,7 @@ Valid values: `SettingsCatalog`, `EndpointSecurity`, `DeviceConfig`,
 | `-RefreshDefinitions` |   | Force fresh definition prefetch and overwrite definitions cache |
 | `-SkipInventory` |   | Skip device/enrollment/app inventory collection |
 | `-GenerateReportData` |   | Also write `ReportData.json` |
+| `-GenerateHtmlReport` |   | Also write `AssessmentReport.html` |
 | `-PreferGraphOsLifecycle` |   | Prefer Graph OS lifecycle source; falls back to static mapping automatically |
 | `-DisableGraphOsLifecycle` |   | Force static `Config\OSDefinition.json` and skip Graph lifecycle calls |
 | `-ConfigPath` |   | Location of `AppConfig.json` and `DomainMapping.json` (default: `Config\`) |
@@ -317,12 +321,28 @@ FindingsByDomain  — grouped findings, full recommendations
 You generally don't read this file by hand — it exists so the report template
 can populate itself.
 
-The `DeviceInventory` block now also includes:
+### 5.5 The `AssessmentReport.html`
+
+Only written when `-GenerateHtmlReport` is passed. It is a self-contained HTML
+file that can be opened in any browser and shared as a quick readout.
+
+Structure:
+- **Executive Summary**: total settings, result distribution, finding counts
+- **Domain Overview**: per-domain totals and result mix
+- **Baseline Policy Overview**: per-policy totals for total/compliant/conflict/missing
+- **Detailed Sections** (collapsible): top findings, settings conflicts,
+  comparison sample rows, and inventory highlights
+
+This report is intentionally additive and does not replace CSV/JSON outputs.
+
+### 5.6 Device lifecycle fields in `ReportData.json`
+
+The `DeviceInventory` block includes:
 - `ByOsSupportState` (Supported/Unsupported/Unknown counts)
 - `ByWindowsRelease` (release label counts, e.g. Windows 11 23H2)
 - `UnsupportedDeviceCount`
 
-### 5.5 The console summary
+### 5.7 The console summary
 
 At the end of the run the tool prints something like:
 
@@ -352,7 +372,7 @@ At the end of the run the tool prints something like:
 This is identical to what ends up in `ReportData.json` — the console version is
 there so you can sanity-check the run before sharing results.
 
-### 5.6 Maturity scores (0–5)
+### 5.8 Maturity scores (0–5)
 
 Each of the 5 assessment domains gets a score based on compliance %:
 
@@ -365,7 +385,7 @@ Each of the 5 assessment domains gets a score based on compliance %:
 | 75–89%  | 4 | Managed |
 | 90–100% | 5 | Optimised |
 
-### 5.7 The 5 assessment domains
+### 5.9 The 5 assessment domains
 
 Every setting is tagged with exactly one domain so reports can aggregate
 findings by area of responsibility:
@@ -376,7 +396,7 @@ findings by area of responsibility:
 4. **Application Lifecycle** — app deployment, protection policies
 5. **Operations & Monitoring** — logging, telemetry, service health
 
-### 5.8 Findings
+### 5.10 Findings
 
 A **finding** is an aggregated observation — not one setting but a pattern
 across many. For example, *"LAPS is not configured"* might aggregate 8 missing
@@ -464,6 +484,11 @@ updated.
 
 **Does the tool change anything in the customer tenant?**
 No — all Graph calls are read-only.
+
+**Then why add Graph POST support?**
+The Graph helper now supports optional request body and headers so Phase 4 async
+reporting APIs can be integrated without redesigning the HTTP layer. Phase 3
+itself remains read-only.
 
 **Does it store credentials anywhere?**
 `Config\AppConfig.json` holds the app registration secret. It is git-ignored

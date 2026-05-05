@@ -62,6 +62,9 @@
 .PARAMETER GenerateReportData
     Also write a ReportData.json with aggregated scores for report population.
 
+.PARAMETER GenerateHtmlReport
+    Also write an AssessmentReport.html with executive summary and detailed sections.
+
 .PARAMETER PreferGraphOsLifecycle
     Prefer Microsoft Graph Windows lifecycle metadata for OS enrichment.
     Falls back to Config\OSDefinition.json when unavailable.
@@ -119,6 +122,7 @@ param(
     [switch]$UseDefinitionsCache,
     [switch]$RefreshDefinitions,
     [switch]$GenerateReportData,
+    [switch]$GenerateHtmlReport,
     [switch]$SkipInventory,
     [switch]$PreferGraphOsLifecycle = $true,
     [switch]$DisableGraphOsLifecycle,
@@ -156,7 +160,7 @@ Write-Host ''
 # ─────────────────────────────────────────────────────────────────────────────
 $moduleRoot = Join-Path $PSScriptRoot 'Modules'
 
-foreach ($moduleName in @('Auth', 'GraphAPI', 'DefinitionCache', 'PolicyReader', 'EndpointSecurityReader', 'DeviceConfigReader', 'AdminTemplateReader', 'CompliancePolicyReader', 'SecurityBaselineReader', 'OsLifecycleProvider', 'DeviceInventoryReader', 'EnrollmentAnalyzer', 'AppInventoryReader', 'Comparison', 'Enrichment', 'RecommendationEngine', 'Export')) {
+foreach ($moduleName in @('Auth', 'GraphAPI', 'DefinitionCache', 'PolicyReader', 'EndpointSecurityReader', 'DeviceConfigReader', 'AdminTemplateReader', 'CompliancePolicyReader', 'SecurityBaselineReader', 'OsLifecycleProvider', 'DeviceInventoryReader', 'EnrollmentAnalyzer', 'AppInventoryReader', 'Comparison', 'Enrichment', 'RecommendationEngine', 'Export', 'HtmlReportGenerator')) {
     $modulePath = Join-Path $moduleRoot "$moduleName.psm1"
     if (-not (Test-Path $modulePath)) {
         throw "Required module not found: $modulePath"
@@ -629,6 +633,20 @@ if ($GenerateReportData) {
         -Findings          $findings `
         -SettingsConflicts $settingsConflicts
     Write-Host "  JSON: $jsonPath" -ForegroundColor Green
+}
+
+if ($GenerateHtmlReport) {
+    $htmlPath = Export-HtmlAssessmentReport `
+        -Results           $comparisonResults `
+        -OutputPath        $OutputPath `
+        -CustomerName      $CustomerName `
+        -BaselineLevel     $BaselineLevel `
+        -DeviceInventory   $deviceInventory `
+        -EnrollmentData    $enrollmentData `
+        -AppInventory      $appInventory `
+        -Findings          $findings `
+        -SettingsConflicts $settingsConflicts
+    Write-Host "  HTML: $htmlPath" -ForegroundColor Green
 }
 
 # ─────────────────────────────────────────────────────────────────────────────

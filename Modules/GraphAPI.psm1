@@ -19,6 +19,10 @@ function Invoke-IbaGraphRequest {
         Bearer access token.
     .PARAMETER Method
         HTTP method (default GET).
+    .PARAMETER Body
+        Optional request payload. Hashtables/objects are JSON-encoded automatically.
+    .PARAMETER AdditionalHeaders
+        Optional additional HTTP headers merged onto default Graph headers.
     .PARAMETER MaxRetries
         Maximum number of retry attempts for throttling / transient errors.
     .PARAMETER TimeoutSec
@@ -35,6 +39,8 @@ function Invoke-IbaGraphRequest {
         [string]$Token,
 
         [string]$Method     = 'GET',
+        [object]$Body       = $null,
+        [hashtable]$AdditionalHeaders = $null,
         [int]   $MaxRetries = 5,
         [int]   $TimeoutSec = 120
     )
@@ -44,18 +50,37 @@ function Invoke-IbaGraphRequest {
         'Content-Type'   = 'application/json'
         ConsistencyLevel = 'eventual'
     }
+    if ($AdditionalHeaders) {
+        foreach ($key in $AdditionalHeaders.Keys) {
+            $headers[$key] = $AdditionalHeaders[$key]
+        }
+    }
+
+    $requestBody = $null
+    if ($PSBoundParameters.ContainsKey('Body') -and $null -ne $Body) {
+        if ($Body -is [string]) {
+            $requestBody = $Body
+        } else {
+            $requestBody = $Body | ConvertTo-Json -Depth 10
+        }
+    }
 
     $attempt = 0
 
     while ($attempt -le $MaxRetries) {
         try {
             Write-Verbose "[$Method] $Uri  (attempt $($attempt + 1))"
-            $response = Invoke-RestMethod `
-                -Uri         $Uri `
-                -Method      $Method `
-                -Headers     $headers `
-                -TimeoutSec  $TimeoutSec `
-                -ErrorAction Stop
+            $invokeParams = @{
+                Uri         = $Uri
+                Method      = $Method
+                Headers     = $headers
+                TimeoutSec  = $TimeoutSec
+                ErrorAction = 'Stop'
+            }
+            if ($null -ne $requestBody) {
+                $invokeParams['Body'] = $requestBody
+            }
+            $response = Invoke-RestMethod @invokeParams
             return $response
         }
         catch {
@@ -85,7 +110,7 @@ function Invoke-IbaGraphRequest {
                 $attempt++
             }
             elseif ($statusCode -in @(500, 502, 503, 504) -and $attempt -lt $MaxRetries) {
-                $wait = 5 * ($attempt + 1)   # progressive back-off: 5, 10, 15 …
+                $wait = 5 * ($attempt + 1)   # progressive back-off: 5, 10, 15 ...
                 Write-Warning "Transient error ($statusCode) on '$Uri'. Waiting $wait s... (retry $($attempt + 1)/$MaxRetries)"
                 Start-Sleep -Seconds $wait
                 $attempt++
@@ -98,7 +123,7 @@ function Invoke-IbaGraphRequest {
                 }
                 if (-not $detail) { $detail = $_.Exception.Message }
                 $statusLabel = if ($statusCode -gt 0) { "[$statusCode]" } else { "[no-status]" }
-                throw "Graph API $statusLabel $Uri — $detail"
+                throw "Graph API $statusLabel $Uri - $detail"
             }
         }
     }
