@@ -138,7 +138,7 @@
         "type": "keyword_cluster",
         "keywords": ["Defender", "Antivirus", "RealTimeMonitoring", "CloudProtection", "AntiMalware"],
         "resultFilter": ["Missing", "Conflict"],
-        "threshold": 0.4
+        "threshold": 0.5
       },
       "detail": "Microsoft Defender Antivirus is het primaire eindpuntbeveiligingsplatform voor Windows-apparaten. {count} van {total} Defender-gerelateerde instellingen ontbreken of zijn fout geconfigureerd, waardoor apparaten mogelijk niet over adequate realtime bescherming beschikken tegen malware en bedreigingen.",
       "recommendation": "Controleer en configureer alle Defender Antivirus-instellingen, waaronder realtime beveiliging, cloud-bescherming, automatische voorbeeldinzending en PUA-detectie. Sluit aan op de aanbevolen beveiligingsbasislijnen van Microsoft."
@@ -151,7 +151,7 @@
       "trigger": {
         "type": "keyword_cluster",
         "keywords": ["Firewall", "MdmStore"],
-        "resultFilter": ["Missing"],
+        "resultFilter": ["Missing", "Conflict"],
         "threshold": 0.6
       },
       "detail": "Windows Defender Firewall beheert inkomend en uitgaand netwerkverkeer. {count} van {total} firewall-gerelateerde instellingen ontbreken, waardoor apparaten verstoken blijven van centraal beheerde netwerkbeveiliging.",
@@ -165,7 +165,7 @@
       "trigger": {
         "type": "keyword_cluster",
         "keywords": ["AttackSurfaceReduction", "ASR", "ExploitGuard", "ExploitProtection"],
-        "resultFilter": ["Missing"],
+        "resultFilter": ["Missing", "Conflict"],
         "threshold": 0.6
       },
       "detail": "Attack Surface Reduction (ASR)-regels blokkeren veelgebruikte aanvalstechnieken door malware, zoals misbruik van Office-macro's, het stelen van inloggegevens en scriptgebaseerde aanvallen. {count} van {total} ASR-gerelateerde instellingen zijn niet geconfigureerd.",
@@ -214,6 +214,272 @@
       "recommendation": "Deploy app-beveiligingsbeleid voor de belangrijkste zakelijke toepassingen (Outlook, Teams, OneDrive, Edge). Configureer beperkingen voor gegevensoverdracht, PIN-vereisten en instellingen voor conditioneel starten."
     },
     {
+      "id": "applocker-or-wdac-missing",
+      "name": "AppLocker of WDAC niet geconfigureerd",
+      "domain": "Endpoint Security",
+      "severity": "High",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["AppLocker", "WDAC", "ApplicationControl", "CodeIntegrity"],
+        "resultFilter": ["Missing", "Conflict"],
+        "threshold": 0.5
+      },
+      "detail": "Application control (AppLocker of Windows Defender Application Control) blokkeert de uitvoering van niet-vertrouwde binaries en scripts. {count} van {total} application-control-instellingen ontbreken of zijn fout geconfigureerd, waardoor LOLBins, ongetekende binaries en kwaadaardige scripts vrij kunnen worden uitgevoerd.",
+      "recommendation": "Implementeer AppLocker of Windows Defender Application Control op beheerde Windows-apparaten. Begin in audit-modus om legitieme workloads in kaart te brengen, definieer baseline allow-rules en schakel daarna over naar enforce. Stem af op CIS- of Microsoft Application Control-richtlijnen."
+    },
+    {
+      "id": "device-credential-guard-missing",
+      "name": "Device Guard / Credential Guard niet geconfigureerd",
+      "domain": "Endpoint Security",
+      "severity": "High",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["DeviceGuard", "CredentialGuard", "VirtualizationBasedSecurity", "VBS", "HVCI", "HypervisorEnforcedCodeIntegrity"],
+        "resultFilter": ["Missing", "Conflict"],
+        "threshold": 0.5
+      },
+      "detail": "Device Guard, Credential Guard en Hypervisor-Enforced Code Integrity (HVCI) bieden hardwarebescherming tegen credential theft (pass-the-hash, mimikatz) en kernel-niveau exploits. {count} van {total} VBS-gerelateerde instellingen ontbreken of zijn fout geconfigureerd. Zonder deze controles blijven LSASS-credentials en kernel-modules kwetsbaar voor moderne aanvalstechnieken.",
+      "recommendation": "Schakel Virtualization-Based Security, Credential Guard en HVCI in via Endpoint Security \u2192 Account Protection of Settings Catalog. Valideer hardware-vereisten (TPM 2.0, UEFI met Secure Boot) en plan een gefaseerde uitrol om compatibiliteitsissues met legacy drivers vroegtijdig te detecteren."
+    },
+    {
+      "id": "tamper-protection-missing",
+      "name": "Tamper Protection niet afgedwongen",
+      "domain": "Endpoint Security",
+      "severity": "High",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["TamperProtection", "Tamper"],
+        "resultFilter": ["Missing", "Conflict"],
+        "threshold": 0.5
+      },
+      "detail": "Tamper Protection voorkomt dat gebruikers en malware de instellingen van Microsoft Defender (real-time scanning, cloud-based protection, IOAV) lokaal uitschakelen. {count} van {total} tamper-protection-instellingen ontbreken of zijn fout geconfigureerd, waardoor de antivirusconfiguratie ongedaan kan worden gemaakt vanaf het apparaat zelf.",
+      "recommendation": "Schakel Tamper Protection in via een Defender Antivirus-policy (Settings Catalog of Endpoint Security). Combineer met centrale Defender-rapportage zodat afwijkingen direct zichtbaar worden in het Defender-portaal."
+    },
+    {
+      "id": "controlled-folder-access-missing",
+      "name": "Controlled Folder Access niet geconfigureerd",
+      "domain": "Endpoint Security",
+      "severity": "Medium",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["ControlledFolderAccess", "ControlledFolder"],
+        "resultFilter": ["Missing", "Conflict"],
+        "threshold": 0.5
+      },
+      "detail": "Controlled Folder Access blokkeert wijzigingen aan beschermde mappen door niet-vertrouwde toepassingen \u2014 een primaire mitigatie tegen ransomware. {count} van {total} CFA-instellingen ontbreken of zijn fout geconfigureerd, waardoor gebruikersdata kwetsbaar blijft voor file-encrypting malware.",
+      "recommendation": "Schakel Controlled Folder Access in via een ASR- of Defender-policy. Start in audit-modus om legitieme apps te identificeren, definieer trusted-app uitzonderingen waar nodig en zet daarna in op block-mode."
+    },
+    {
+      "id": "exploit-protection-missing",
+      "name": "Exploit Protection niet geconfigureerd",
+      "domain": "Endpoint Security",
+      "severity": "Medium",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["ExploitProtection", "ExploitGuard"],
+        "resultFilter": ["Missing", "Conflict"],
+        "threshold": 0.5
+      },
+      "detail": "Exploit Protection zet system- en process-mitigations in (DEP, ASLR, CFG, SEHOP) die exploitatie van geheugenbugs bemoeilijken. {count} van {total} exploit-protection-instellingen ontbreken of zijn fout geconfigureerd. Zonder deze laag worden kwetsbaarheden in third-party software laagdrempeliger te misbruiken.",
+      "recommendation": "Deploy een Exploit Protection-XML via Settings Catalog of Endpoint Security. Vertrek vanuit Microsoft's recommended exploit protection settings en pas applicatie-specifieke uitzonderingen toe waar nodig."
+    },
+    {
+      "id": "network-protection-missing",
+      "name": "Network Protection niet geconfigureerd",
+      "domain": "Endpoint Security",
+      "severity": "Medium",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["NetworkProtection", "EnableNetworkProtection"],
+        "resultFilter": ["Missing", "Conflict"],
+        "threshold": 0.5
+      },
+      "detail": "Network Protection blokkeert verbindingen naar bekende kwaadaardige domeinen, IP-adressen en phishing-URLs vanuit elke proces op het apparaat (niet alleen browsers). {count} van {total} Network Protection-instellingen ontbreken of zijn fout geconfigureerd.",
+      "recommendation": "Schakel Network Protection in (block-modus) via een Defender- of ASR-policy. Combineer met Defender SmartScreen en valideer dat Defender Cloud Protection actief is voor maximale signaalkwaliteit."
+    },
+    {
+      "id": "personal-data-encryption-missing",
+      "name": "Personal Data Encryption niet geconfigureerd",
+      "domain": "Endpoint Security",
+      "severity": "Medium",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["PersonalDataEncryption", "PDE"],
+        "resultFilter": ["Missing"],
+        "threshold": 0.5
+      },
+      "detail": "Personal Data Encryption (PDE) versleutelt gebruikersbestanden met user-bound keys bovenop BitLocker, zodat data ontoegankelijk blijft tot de gebruiker is aangemeld. {count} van {total} PDE-instellingen zijn niet geconfigureerd \u2014 een gemiste kans voor data-protectie bij apparaten waar meerdere gebruikers of admin-accounts toegang hebben.",
+      "recommendation": "Activeer Personal Data Encryption via Settings Catalog (Windows 11 22H2+). Combineer met Windows Hello for Business voor sterke user-binding en valideer dat backup-/recovery-procedures de PDE-flow ondersteunen."
+    },
+    {
+      "id": "smartscreen-not-configured",
+      "name": "SmartScreen niet afgedwongen",
+      "domain": "Endpoint Security",
+      "severity": "Medium",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["SmartScreen", "EnableSmartScreen"],
+        "resultFilter": ["Missing", "Conflict"],
+        "threshold": 0.5
+      },
+      "detail": "Microsoft Defender SmartScreen blokkeert phishing-sites, kwaadaardige downloads en niet-vertrouwde apps op OS-, Edge- en Office-niveau. {count} van {total} SmartScreen-instellingen ontbreken of zijn fout geconfigureerd, waardoor een eerstelijns-mitigatie tegen drive-by-downloads en credential-phishing ontbreekt.",
+      "recommendation": "Configureer SmartScreen via Settings Catalog voor zowel Windows shell, Microsoft Edge als Microsoft 365 Apps. Stel block-modus af op organisatie-tolerantie en sluit af met monitoring via het Defender-portaal."
+    },
+    {
+      "id": "enrollment-status-page-missing",
+      "name": "Enrollment Status Page niet geconfigureerd",
+      "domain": "Operations & Monitoring",
+      "severity": "Medium",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["EnrollmentStatusPage", "ESP"],
+        "resultFilter": ["Missing", "Conflict"],
+        "threshold": 0.5
+      },
+      "detail": "De Enrollment Status Page (ESP) regelt de gebruikerservaring en blokkerend gedrag tijdens Autopilot- en MDM-enrollment. {count} van {total} ESP-instellingen ontbreken of zijn fout geconfigureerd. Zonder een goed geconfigureerde ESP kunnen gebruikers met een onvolledig geconfigureerd toestel inloggen, wat tot supportvragen en beveiligingsgaten leidt.",
+      "recommendation": "Configureer een Enrollment Status Page met blocking voor kritieke apps en Settings Catalog-policies. Stel een redelijke timeout in en zorg voor heldere foutboodschappen en een fallback-procedure voor de helpdesk."
+    },
+    {
+      "id": "delivery-optimization-not-configured",
+      "name": "Delivery Optimization niet geconfigureerd",
+      "domain": "Operations & Monitoring",
+      "severity": "Low",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["DeliveryOptimization", "DOCacheHost", "DODownloadMode"],
+        "resultFilter": ["Missing"],
+        "threshold": 0.5
+      },
+      "detail": "Delivery Optimization (DO) verlaagt bandbreedte- en WAN-belasting door peer-caching van Windows-, Office- en Intune Win32-app-content. {count} van {total} DO-instellingen ontbreken, waardoor updates en app-installaties onnodig drukken op de internetverbinding van de organisatie.",
+      "recommendation": "Configureer Delivery Optimization via Settings Catalog: kies een geschikte DownloadMode (group, internet of LAN+Group), zet peer-caching aan voor LAN/WAN, en stel limieten in op piek/off-piek bandbreedte."
+    },
+    {
+      "id": "telemetry-not-configured",
+      "name": "Telemetry / Diagnostic Data niet geconfigureerd",
+      "domain": "Operations & Monitoring",
+      "severity": "Low",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["AllowTelemetry", "Telemetry", "Diagnostic", "DiagnosticData"],
+        "resultFilter": ["Missing"],
+        "threshold": 0.5
+      },
+      "detail": "Diagnostic Data (telemetry) voedt Windows Update for Business reports, Endpoint Analytics en Defender voor analytics. {count} van {total} telemetry-instellingen ontbreken, waardoor inzicht in update-, performance- en beveiligingsstatistieken beperkt blijft.",
+      "recommendation": "Configureer Diagnostic Data via Settings Catalog: zet telemetry minimaal op 'Required' en activeer de aanvullende toggles voor Windows Analytics, Endpoint Analytics en (waar van toepassing) Defender Sample Submission. Documenteer privacy-impact in lijn met intern beleid."
+    },
+    {
+      "id": "winget-policy-missing",
+      "name": "WinGet / Desktop App Installer niet geconfigureerd",
+      "domain": "Application Lifecycle",
+      "severity": "Low",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["WinGet", "DesktopAppInstaller"],
+        "resultFilter": ["Missing"],
+        "threshold": 0.5
+      },
+      "detail": "WinGet / Desktop App Installer is de officiële command-line package manager van Microsoft en \u2014 mits ingeperkt \u2014 een veilig kanaal voor self-service en automatisering. {count} van {total} WinGet-instellingen ontbreken, waardoor WinGet-bronnen, source-trust en Microsoft Store-integratie ongecontroleerd zijn.",
+      "recommendation": "Beperk WinGet-bronnen tot vertrouwde sources, configureer een private repository indien aanwezig, en koppel WinGet-deployments aan Intune-app-management waar mogelijk."
+    },
+    {
+      "id": "microsoft-store-not-restricted",
+      "name": "Microsoft Store niet beperkt",
+      "domain": "Application Lifecycle",
+      "severity": "Low",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["MicrosoftAppStore", "RequirePrivateStoreOnly", "AppStore", "Store-Config"],
+        "resultFilter": ["Missing", "Conflict"],
+        "threshold": 0.5
+      },
+      "detail": "Een onbeperkte Microsoft Store laat gebruikers willekeurige apps installeren \u2014 inclusief games, social-media-clients en niet-zakelijke tools. {count} van {total} Store-instellingen ontbreken of zijn fout geconfigureerd. In een hardened context zou de Store moeten beperkt worden tot een private store of volledig uitgeschakeld op managed apparaten.",
+      "recommendation": "Configureer Microsoft Store-restricties via Settings Catalog: zet 'Require private store only' aan of schakel publieke installs uit. Combineer met expliciete Intune-app-deployments voor goedgekeurde Store-apps."
+    },
+    {
+      "id": "printer-policies-missing",
+      "name": "Printerbeleid niet geconfigureerd",
+      "domain": "Device Management",
+      "severity": "Low",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["Printer", "PointAndPrint", "PrintNightmare", "RpcAuthnLevelPrivacyEnabled"],
+        "resultFilter": ["Missing", "Conflict"],
+        "threshold": 0.5
+      },
+      "detail": "Print-spooler-misbruik (PrintNightmare) en onbeperkte Point and Print-installaties zijn herhaaldelijk uitgebuit voor lokale privilege-escalatie. {count} van {total} printerbeleids-instellingen ontbreken of zijn fout geconfigureerd.",
+      "recommendation": "Hardening van Point and Print: beperk driver-installaties tot beheerders, schakel package-aware printers af, en pas Microsoft's PrintNightmare-mitigaties toe via Settings Catalog. Overweeg een gecentraliseerde print-oplossing voor grote omgevingen."
+    },
+    {
+      "id": "lockscreen-policy-missing",
+      "name": "Lockscreen-beleid niet geconfigureerd",
+      "domain": "Device Management",
+      "severity": "Low",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["Lockscreen", "LoginLockscreen", "ScreenSaver"],
+        "resultFilter": ["Missing"],
+        "threshold": 0.5
+      },
+      "detail": "Lockscreen- en screensaver-instellingen bepalen automatische vergrendeling, weergave van gevoelige notificaties en achtergrondafbeeldingen. {count} van {total} lockscreen-instellingen ontbreken, waardoor onbeheerde sessies langer onbeveiligd blijven en notificaties met gevoelige inhoud zichtbaar kunnen zijn voor passanten.",
+      "recommendation": "Configureer een lockscreen-policy met een redelijke inactivity-timeout, verberg gevoelige notificaties op het lockscreen en standaardiseer indien gewenst de achtergrond met een organisatie-asset."
+    },
+    {
+      "id": "wsl-not-restricted",
+      "name": "WSL niet beperkt",
+      "domain": "Device Management",
+      "severity": "Low",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["WSL", "WindowsSubsystemForLinux"],
+        "resultFilter": ["Missing", "Conflict"],
+        "threshold": 0.5
+      },
+      "detail": "Windows Subsystem for Linux (WSL) biedt een volledig Linux-OS binnen Windows. Zonder restricties kunnen gebruikers willekeurige distributies installeren en buiten Defender's standaardzicht code uitvoeren. {count} van {total} WSL-instellingen ontbreken of zijn fout geconfigureerd.",
+      "recommendation": "Beperk WSL via Settings Catalog: schakel uit voor de meeste gebruikers, of wit-list specifieke distributies en activeer Defender for Linux-integratie waar WSL nodig is."
+    },
+    {
+      "id": "windows-sandbox-not-restricted",
+      "name": "Windows Sandbox niet beperkt",
+      "domain": "Device Management",
+      "severity": "Low",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["WindowsSandbox", "AllowSandbox"],
+        "resultFilter": ["Missing"],
+        "threshold": 0.5
+      },
+      "detail": "Windows Sandbox biedt een wegwerp-VM-omgeving die per default vrij verbinding maakt met netwerk en clipboard. {count} van {total} sandbox-instellingen zijn niet geconfigureerd. In hardened omgevingen zouden netwerk, clipboard en GPU-passthrough expliciet beperkt moeten zijn.",
+      "recommendation": "Configureer Windows Sandbox-restricties via Settings Catalog: schakel uit waar niet vereist, of beperk netwerk- en clipboardtoegang en log activiteit waar de feature nodig is voor analyse-/test-doeleinden."
+    },
+    {
+      "id": "copilot-policy-missing",
+      "name": "Copilot / Windows AI niet geconfigureerd",
+      "domain": "Device Management",
+      "severity": "Low",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["Copilot", "WindowsAI", "TurnOffWindowsCopilot"],
+        "resultFilter": ["Missing"],
+        "threshold": 0.5
+      },
+      "detail": "Windows Copilot en aanverwante AI-features (Recall, Click to Do) verwerken gebruikerscontext en mogelijk gevoelige inhoud. {count} van {total} Copilot-instellingen ontbreken. Zonder expliciet beleid kan AI-inhoud onbedoeld worden gebruikt of gedeeld in een bedrijfscontext.",
+      "recommendation": "Definieer een organisatiebeleid voor Windows Copilot en Recall: schakel uit waar AI-functionaliteit nog niet is goedgekeurd, of activeer alleen voor pilotgroepen. Documenteer dataverwerking in lijn met intern AI-beleid."
+    },
+    {
+      "id": "time-sync-not-configured",
+      "name": "Tijdsynchronisatie niet geconfigureerd",
+      "domain": "Device Management",
+      "severity": "Low",
+      "trigger": {
+        "type": "keyword_cluster",
+        "keywords": ["TimeZone", "Time Service", "NtpClient", "W32Time"],
+        "resultFilter": ["Missing"],
+        "threshold": 0.5
+      },
+      "detail": "Correcte en betrouwbare tijdsynchronisatie is een randvoorwaarde voor Kerberos, certificaten, audit-correlatie en log-betrouwbaarheid. {count} van {total} tijds-/NTP-instellingen ontbreken. Drift kan leiden tot authenticatiefouten en onbruikbare audit-trails.",
+      "recommendation": "Configureer W32Time-/NTP-instellingen via Settings Catalog: stel betrouwbare NTP-servers in, kies een geschikte tijdzone-policy en activeer auto time-zone updates waar geografisch zinvol."
+    },
+    {
       "id": "compliance-coverage-low",
       "name": "Compliancebeleid-dekking te laag",
       "domain": "Compliance & Governance",
@@ -221,7 +487,7 @@
       "trigger": {
         "type": "domain_ratio",
         "domain": "Compliance & Governance",
-        "resultFilter": ["Missing"],
+        "resultFilter": ["Missing", "Conflict"],
         "threshold": 0.4
       },
       "detail": "Meer dan {percent}% van de baseline-complianceinstellingen ontbreken in de klanttenant. Compliancebeleid is essentieel voor het afdwingen van beveiligingsvereisten en het beheren van toegang via Conditional Access.",
@@ -263,7 +529,7 @@
       "trigger": {
         "type": "domain_ratio",
         "domain": "Application Lifecycle",
-        "resultFilter": ["Missing"],
+        "resultFilter": ["Missing", "Conflict"],
         "threshold": 0.5
       },
       "detail": "Meer dan {percent}% van de baseline Application Lifecycle-instellingen ontbreken. Dit domein omvat app-implementatie, app-beveiligingsbeleid en browserhardening.",
@@ -298,6 +564,18 @@
       "recommendation": "Controleer overlappende beleidsregels en consolideer instellingen om conflicten te vermijden. Gebruik Intune's rapportage over beleidsconflicten om te bepalen welk beleid van toepassing is. Overweeg overlappende beleidsregels samen te voegen waar mogelijk."
     },
     {
+      "id": "duplicate-policy-coverage-high",
+      "name": "Significante overlap in beleidsinstellingen",
+      "domain": "Operations & Monitoring",
+      "severity": "Medium",
+      "trigger": {
+        "type": "duplicate_coverage",
+        "threshold": 50
+      },
+      "detail": "{count} instellingen worden geconfigureerd door meerdere klantbeleidsregels met afwijkende waarden. Bij dit volume worden conflicten moeilijk handmatig te traceren, neemt de kans op tegenstrijdig effectief beleid sterk toe en wordt troubleshooting van apparaatgedrag aanzienlijk complexer.",
+      "recommendation": "Voer een gerichte consolidatie-actie uit: groepeer overlappende beleidsregels per domein, breng setting-conflicten in kaart vanuit `SettingsConflicts.csv`, en plan een traject om dubbele instellingen samen te voegen of te decommissioneren. Documenteer de gewenste 'single source of truth' per instellingscategorie."
+    },
+    {
       "id": "unassigned-policies-detected",
       "name": "Niet-toegewezen beleidsregels gedetecteerd",
       "domain": "Operations & Monitoring",
@@ -313,10 +591,25 @@
       "recommendation": "Controleer niet-toegewezen beleidsregels, wijs ze toe aan de juiste doelgroepen of verwijder ze om configuratieruis te beperken."
     },
     {
+      "id": "dead-policies-detected",
+      "name": "Mogelijk dode beleidsregels gedetecteerd",
+      "domain": "Operations & Monitoring",
+      "severity": "Medium",
+      "trigger": {
+        "type": "phase4_metric",
+        "source": "assignmentSummary",
+        "field": "PotentiallyDeadPolicyCount",
+        "operator": "count_gte",
+        "threshold": 1
+      },
+      "detail": "Er zijn {count} beleidsregels met enkel exclusion-toewijzingen of zonder include-target. Deze 'mogelijk dode' beleidsregels worden niet effectief afgedwongen, maar geven wel een vals gevoel van dekking en bemoeilijken impactanalyse.",
+      "recommendation": "Beoordeel iedere als potentially dead gemarkeerde policy: voeg een geldige include-toewijzing toe, retire de policy of documenteer expliciet waarom de exclusion-only-staat correct is (bijv. tijdelijke uitsluiting)."
+    },
+    {
       "id": "apps-with-install-failures",
       "name": "Applicaties met installatiefouten",
       "domain": "Application Lifecycle",
-      "severity": "Medium",
+      "severity": "Low",
       "trigger": {
         "type": "phase4_metric",
         "source": "advancedSummary",
@@ -324,8 +617,119 @@
         "operator": "count_gte",
         "threshold": 1
       },
-      "detail": "{count} applicaties tonen installatiefouten in de geaggregeerde Intune-rapportage.",
-      "recommendation": "Onderzoek de betrokken applicaties en herstel detectieregels, afhankelijkheden of requirements om het foutpercentage te verlagen."
+      "detail": "{count} applicaties tonen installatiefouten in de geaggregeerde Intune-rapportage. Dit is een breed signaal: kleine aantallen mislukte apparaten zijn vaak normaal, maar moeten wel periodiek opgevolgd worden.",
+      "recommendation": "Onderzoek de betrokken applicaties en herstel detectieregels, afhankelijkheden of requirements om het foutpercentage te verlagen. Combineer dit signaal met de bevinding over apps met een hoog faalpercentage voor prioritering."
+    },
+    {
+      "id": "apps-with-failures-percent-high",
+      "name": "Significant deel van apps toont installatiefouten",
+      "domain": "Application Lifecycle",
+      "severity": "High",
+      "trigger": {
+        "type": "phase4_metric",
+        "source": "advancedSummary",
+        "field": "AppsWithFailures",
+        "denominator": "AppCount",
+        "operator": "percent_gte",
+        "threshold": 0.2
+      },
+      "detail": "{count} van {total} applicaties ({percent}%) hebben installatiefouten op één of meer apparaten. Bij dit percentage is er sprake van een systemisch probleem (verkeerde detectieregels, ontbrekende dependencies, niet-deployable Win32-content) eerder dan losse incidenten.",
+      "recommendation": "Voer een sweep uit op de meest falende applicaties: valideer detectieregels en requirements, controleer Win32-content-integriteit en breng eventuele structurele issues (bv. verouderde packaging-templates) in kaart. Stel een drempelwaarde voor `Failed Device Percentage` in voor doorlopende monitoring."
+    },
+    {
+      "id": "apps-with-high-failure-rate",
+      "name": "Applicaties met hoog faalpercentage",
+      "domain": "Application Lifecycle",
+      "severity": "High",
+      "trigger": {
+        "type": "phase4_collection",
+        "source": "appInstallAggregate",
+        "rowCondition": {
+          "field": "FailedDevicePercentage",
+          "operator": "gte",
+          "value": 50
+        },
+        "operator": "count_gte",
+        "threshold": 1
+      },
+      "detail": "{count} applicatie(s) hebben een faalpercentage van 50% of hoger op de doelgroep. Dergelijke apps blokkeren installatie op de meerderheid van targets en duiden vrijwel altijd op een fout in detectie, requirements of content.",
+      "recommendation": "Open `AppInstallStatusAggregateSummary.csv`, sorteer op `Failed Device Percentage` en analyseer de top-falende apps eerst. Controleer detectieregels (registry/file/script), pas requirements aan op de werkelijke target-OS-mix, en valideer Win32-content (intunewin) op corruptie of foutieve uninstall-commands."
+    },
+    {
+      "id": "policies-with-errors",
+      "name": "Beleidsregels met deployment errors",
+      "domain": "Operations & Monitoring",
+      "severity": "High",
+      "trigger": {
+        "type": "phase4_collection",
+        "source": "policyStatusOverview",
+        "rowCondition": {
+          "field": "Error",
+          "operator": "gte",
+          "value": 5
+        },
+        "operator": "count_gte",
+        "threshold": 1
+      },
+      "detail": "{count} beleidsregel(s) hebben minstens 5 apparaten in error-status volgens de Intune-rapportage. Errors blokkeren effectieve handhaving en wijzen typisch op syntaxfouten in custom OMA-URI's, conflicterende settings of niet-bestaande targets.",
+      "recommendation": "Filter `PolicyStatusOverviewSummary.csv` op de betreffende beleidsregels, raadpleeg het detail-rapport voor concrete error-codes (bv. 0x87D1...), en herstel de oorzaak \u2014 typisch via correctie van OMA-URI's, settings-conflictresolutie of opheffen van blokkerende dependencies."
+    },
+    {
+      "id": "policies-with-many-conflicts",
+      "name": "Beleidsregels met meerdere conflicten",
+      "domain": "Operations & Monitoring",
+      "severity": "Medium",
+      "trigger": {
+        "type": "phase4_collection",
+        "source": "policyStatusOverview",
+        "rowCondition": {
+          "field": "Conflict",
+          "operator": "gte",
+          "value": 5
+        },
+        "operator": "count_gte",
+        "threshold": 1
+      },
+      "detail": "{count} beleidsregel(s) tonen 5 of meer conflicterende apparaten in de deployment-rapportage. Dat duidt op overlappende settings tussen beleidsregels, waardoor het effectieve gedrag op deze apparaten niet eenduidig is.",
+      "recommendation": "Combineer dit signaal met `SettingsConflicts.csv`: identificeer welke settings overlappen tussen welke policies, en consolideer of priorisseer (via assignment-scope, exclusion-groepen of het samenvoegen van de policies)."
+    },
+    {
+      "id": "policies-not-deployed",
+      "name": "Beleidsregels zonder rapportage",
+      "domain": "Operations & Monitoring",
+      "severity": "Low",
+      "trigger": {
+        "type": "phase4_collection",
+        "source": "policyStatusOverview",
+        "rowCondition": {
+          "field": "NotDeployed",
+          "operator": "eq",
+          "value": "True"
+        },
+        "operator": "count_gte",
+        "threshold": 1
+      },
+      "detail": "{count} beleidsregel(s) zijn aanwezig in de tenantconfiguratie, maar produceren geen rijen in de Intune deployment-rapportage. Dit zijn typisch policies die niet (meer) op apparaten worden geëvalueerd \u2014 onjuist getargetet, niet-applicabel platform, of gewoon ongebruikt.",
+      "recommendation": "Controleer per niet-uitgerolde policy of de toewijzing nog correct is, of het target-platform overeenkomt met aanwezige apparaten en of de policy nog een doel dient. Retire policies die geen functie meer hebben om de configuratiebasis schoon te houden."
+    },
+    {
+      "id": "policies-broadly-assigned",
+      "name": "Beleidsregels breed toegewezen aan All Devices/All Users",
+      "domain": "Operations & Monitoring",
+      "severity": "Low",
+      "trigger": {
+        "type": "phase4_collection",
+        "source": "policyAssignmentSummary",
+        "rowCondition": {
+          "field": "Targets",
+          "operator": "contains",
+          "value": "All Devices"
+        },
+        "operator": "count_gte",
+        "threshold": 5
+      },
+      "detail": "{count} beleidsregel(s) zijn (mede) toegewezen aan 'All Devices'. Bij dit volume is de assignment-strategie weinig gericht: kleine wijzigingen kunnen onbedoeld een grote populatie raken, en het ontbreken van scope-filters bemoeilijkt fasegewijze uitrol.",
+      "recommendation": "Beoordeel of brede 'All Devices'-toewijzing nog gerechtvaardigd is. Overweeg verfijning via dynamische groepen, assignment filters (op OS, model of kind van device) of een gefaseerde uitrolstructuur (pilot \u2192 broad). Documenteer expliciet welke beleidsregels bewust globaal blijven."
     }
   ],
 
@@ -421,6 +825,50 @@
       },
       "detail": "{count} van {total} apparaten ({percent}%) draaien een niet-ondersteunde OS-versie. Apparaten op niet-ondersteunde releases ontvangen geen beveiligingsupdates meer.",
       "recommendation": "Plan upgrades naar ondersteunde Windows-releases voor alle geschikte apparaten. Gebruik updatebeleid en Autopilot om de migratie te stroomlijnen en plan vervanging voor niet-geschikte hardware."
+    },
+    {
+      "id": "devices-unknown-os-lifecycle",
+      "name": "Apparaten met onbekende OS-lifecycle",
+      "domain": "Device Management",
+      "severity": "Low",
+      "trigger": {
+        "type": "inventory_metric",
+        "source": "devices",
+        "field": "OsSupportState",
+        "value": "Unknown",
+        "operator": "percent_gte",
+        "threshold": 0.05
+      },
+      "detail": "{count} van {total} apparaten ({percent}%) hebben een onbekende OS-lifecycle-status. Dit zijn apparaten waarvan het OS-versielabel niet kon worden gemapt op de Graph- of statische OS-definities (typisch oude/onverwachte builds, niet-Windows OS, of onvolledige inventarisdata). Zonder lifecycle-status kan ondersteunings- en EOL-risico niet betrouwbaar worden ingeschat.",
+      "recommendation": "Onderzoek de OS-versies van deze apparaten in de inventaris. Vul ontbrekende mappings aan in `Config/OSDefinition.json`, valideer dat lifecycle-Graph-bronnen beschikbaar zijn en bevestig of niet-Windows-platformen actief beheerd moeten worden."
+    },
+    {
+      "id": "enrollment-configs-missing",
+      "name": "Geen enrollment-configuraties geconfigureerd",
+      "domain": "Operations & Monitoring",
+      "severity": "Medium",
+      "trigger": {
+        "type": "inventory_empty",
+        "source": "enrollmentConfigs"
+      },
+      "detail": "Er zijn geen enrollment-configuraties (Enrollment Status Page, Enrollment Restrictions, MDM-/Autopilot-deployment-profielen) gedetecteerd in de tenant. Zonder expliciete enrollment-controles wordt enrollment-gedrag bepaald door Microsoft-defaults, wat onder andere ongewenste persoonlijke devices kan toelaten en gebruikers laat inloggen op halfgeconfigureerde toestellen.",
+      "recommendation": "Configureer minimaal een Enrollment Status Page met blocking voor kritieke apps, een Enrollment Restrictions-policy om device-types te beperken, en \u2014 indien Autopilot in gebruik is \u2014 een geschikt deployment-profiel."
+    },
+    {
+      "id": "apps-mostly-unassigned-at-scale",
+      "name": "Veel niet-toegewezen applicaties",
+      "domain": "Application Lifecycle",
+      "severity": "Medium",
+      "trigger": {
+        "type": "inventory_metric",
+        "source": "apps",
+        "field": "IsAssigned",
+        "value": "No",
+        "operator": "count_gte",
+        "threshold": 25
+      },
+      "detail": "{count} applicaties in Intune hebben geen toewijzingen. Bij dit volume duidt het op een onvolledig app-lifecycle-proces of historische rommel die het overzicht van actief beheerde apps ondermijnt.",
+      "recommendation": "Voer een gestructureerde app-opschoning uit: identificeer apps zonder toewijzing en zonder recente wijziging, retire wat niet meer relevant is, wijs het overige toe aan de juiste groepen, en leg een terugkerend lifecycle-proces vast (bv. kwartaal-review)."
     }
   ]
 }

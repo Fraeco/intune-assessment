@@ -74,6 +74,14 @@ Phase 1 is implemented in the current codebase.
 3. Build test harness for normalization/comparison/enrichment core functions (Sprint 10 kickoff).
 4. Keep Sprint 8 Word report generation in backlog until Robin merge phases are completed.
 
+## Findings Library Refresh — Status
+- Full pass of `Config/FindingRules.json` completed. Library expanded from 29 → 59 rules.
+- Added two new engine trigger capabilities:
+  - `phase4_metric` now supports `percent_gte` / `percent_gt` with a `denominator` field.
+  - New `phase4_collection` trigger evaluates per-row conditions on Phase 4 advanced-reporting and assignment-analysis collections.
+- Validated end-to-end against the latest Serax tenant `ReportData.json`: new Phase 4 triggers fire on plausible signals; percent thresholds calibrated to avoid noise.
+- Pending follow-up: re-run a full assessment with `-EnableAdvancedReporting -EnableAssignmentAnalysis` to confirm the new findings show correctly in the HTML report and JSON export.
+
 ## Operational Notes
 - Keep all new work Function-ready by default.
 - Preserve existing data contracts to avoid breaking comparison/export pipelines.

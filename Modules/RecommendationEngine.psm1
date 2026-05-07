@@ -283,6 +283,9 @@ function Invoke-StructuralFinding {
         'phase4_metric' {
             return Invoke-Phase4MetricFinding -Rule $Rule -Phase4Data $Phase4Data -AssignmentAnalysis $AssignmentAnalysis
         }
+        'phase4_collection' {
+            return Invoke-Phase4CollectionFinding -Rule $Rule -Phase4Data $Phase4Data -AssignmentAnalysis $AssignmentAnalysis
+        }
         default {
             Write-Verbose "Unknown structural trigger type '$type' for rule '$($Rule.id)'"
             return $null
@@ -303,35 +306,214 @@ function Invoke-Phase4MetricFinding {
     $operator = "$($trigger.operator)"
     $threshold = [double]$trigger.threshold
 
-    $metricValue = 0
+    # Optional denominator for percent_* operators (e.g. AppsWithFailures / AppCount)
+    $denominatorField = ''
+    if ($trigger.PSObject.Properties['denominator']) {
+        $denominatorField = "$($trigger.denominator)"
+    }
+
+    $summary = $null
     switch ($source) {
         'assignmentSummary' {
             if ($AssignmentAnalysis -and $AssignmentAnalysis.ContainsKey('Summary')) {
                 $summary = $AssignmentAnalysis.Summary
-                if ($summary.PSObject.Properties[$field]) {
-                    $metricValue = [double]$summary.$field
-                }
             }
         }
         'advancedSummary' {
             if ($Phase4Data -and $Phase4Data.ContainsKey('Summary')) {
                 $summary = $Phase4Data.Summary
-                if ($summary.PSObject.Properties[$field]) {
-                    $metricValue = [double]$summary.$field
-                }
             }
         }
     }
 
+    $metricValue = 0.0
+    $denominatorValue = 0.0
+    if ($null -ne $summary) {
+        if ($summary.PSObject.Properties[$field]) {
+            $metricValue = [double]$summary.$field
+        }
+        if ($denominatorField -and $summary.PSObject.Properties[$denominatorField]) {
+            $denominatorValue = [double]$summary.$denominatorField
+        }
+    }
+
+    $ratio = if ($denominatorValue -gt 0) { $metricValue / $denominatorValue } else { 0.0 }
+
     $fired = switch ($operator) {
-        'count_gte' { $metricValue -ge $threshold }
-        'count_gt' { $metricValue -gt $threshold }
-        default { $metricValue -ge $threshold }
+        'count_gte'   { $metricValue -ge $threshold }
+        'count_gt'    { $metricValue -gt $threshold }
+        'percent_gte' { ($denominatorValue -gt 0) -and ($ratio -ge $threshold) }
+        'percent_gt'  { ($denominatorValue -gt 0) -and ($ratio -gt $threshold) }
+        default       { $metricValue -ge $threshold }
     }
     if (-not $fired) { return $null }
 
+    if ($operator -in @('percent_gte', 'percent_gt')) {
+        return New-Finding -Rule $Rule -Category 'structural' `
+            -AffectedCount ([int]$metricValue) -Total ([int]$denominatorValue) -Ratio $ratio
+    }
+
     return New-Finding -Rule $Rule -Category 'structural' `
         -AffectedCount ([int]$metricValue) -Total ([int]$metricValue) -Ratio 1.0
+}
+
+function Get-Phase4Collection {
+    param(
+        [string]$Source,
+        [hashtable]$Phase4Data,
+        [hashtable]$AssignmentAnalysis
+    )
+
+    switch ($Source) {
+        'appInstallAggregate' {
+            if ($Phase4Data -and $Phase4Data.ContainsKey('AppInstallStatusAggregate')) {
+                return @($Phase4Data.AppInstallStatusAggregate)
+            }
+        }
+        'policyStatusOverview' {
+            if ($Phase4Data -and $Phase4Data.ContainsKey('PolicyStatusOverview')) {
+                return @($Phase4Data.PolicyStatusOverview)
+            }
+        }
+        'deviceAssignmentStatus' {
+            if ($Phase4Data -and $Phase4Data.ContainsKey('DeviceAssignmentStatusByConfigurationPolicy')) {
+                return @($Phase4Data.DeviceAssignmentStatusByConfigurationPolicy)
+            }
+        }
+        'policyAssignmentSummary' {
+            if ($AssignmentAnalysis -and $AssignmentAnalysis.ContainsKey('PolicyAssignmentSummary')) {
+                return @($AssignmentAnalysis.PolicyAssignmentSummary)
+            }
+        }
+        'unassignedPolicies' {
+            if ($AssignmentAnalysis -and $AssignmentAnalysis.ContainsKey('UnassignedPolicies')) {
+                return @($AssignmentAnalysis.UnassignedPolicies)
+            }
+        }
+        'potentiallyDeadPolicies' {
+            if ($AssignmentAnalysis -and $AssignmentAnalysis.ContainsKey('PotentiallyDeadPolicies')) {
+                return @($AssignmentAnalysis.PotentiallyDeadPolicies)
+            }
+        }
+        default {
+            Write-Verbose "Unknown phase4_collection source '$Source'"
+        }
+    }
+    return @()
+}
+
+function Get-RowFieldValue {
+    param([object]$Row, [string]$Field)
+
+    if ($null -eq $Row -or [string]::IsNullOrEmpty($Field)) { return $null }
+    if ($Row -is [hashtable] -or $Row -is [System.Collections.Specialized.OrderedDictionary]) {
+        if ($Row.Contains($Field)) { return $Row[$Field] }
+        return $null
+    }
+    if ($Row.PSObject.Properties[$Field]) { return $Row.$Field }
+    return $null
+}
+
+function Test-Phase4RowCondition {
+    param(
+        [object]$Row,
+        [psobject]$Condition
+    )
+
+    if ($null -eq $Condition) { return $false }
+
+    $field    = "$($Condition.field)"
+    $operator = "$($Condition.operator)".ToLowerInvariant()
+    $expected = if ($Condition.PSObject.Properties['value']) { $Condition.value } else { $null }
+
+    $actual = Get-RowFieldValue -Row $Row -Field $field
+    if ($null -eq $actual) { return $false }
+
+    # Numeric comparators
+    if ($operator -in @('gte', 'gt', 'lte', 'lt')) {
+        $actualNum   = 0.0
+        $expectedNum = 0.0
+        if (-not [double]::TryParse(("$actual"), [ref]$actualNum))   { return $false }
+        if (-not [double]::TryParse(("$expected"), [ref]$expectedNum)) { return $false }
+        switch ($operator) {
+            'gte' { return $actualNum -ge $expectedNum }
+            'gt'  { return $actualNum -gt  $expectedNum }
+            'lte' { return $actualNum -le  $expectedNum }
+            'lt'  { return $actualNum -lt  $expectedNum }
+        }
+    }
+
+    # String / boolean comparators
+    $actualStr   = "$actual"
+    $expectedStr = "$expected"
+    switch ($operator) {
+        'eq'         { return $actualStr -ieq $expectedStr }
+        'ne'         { return $actualStr -ine $expectedStr }
+        'contains'   { return $actualStr.IndexOf($expectedStr, [System.StringComparison]::OrdinalIgnoreCase) -ge 0 }
+        'startswith' { return $actualStr.StartsWith($expectedStr, [System.StringComparison]::OrdinalIgnoreCase) }
+        'endswith'   { return $actualStr.EndsWith($expectedStr,   [System.StringComparison]::OrdinalIgnoreCase) }
+        default {
+            Write-Verbose "Unknown phase4_collection rowCondition operator '$operator'"
+            return $false
+        }
+    }
+}
+
+function Invoke-Phase4CollectionFinding {
+    <#
+    .SYNOPSIS
+        Evaluates a phase4_collection trigger by counting rows that satisfy a per-row
+        condition in a Phase 4 collection (advanced reporting or assignment analysis).
+    #>
+    param(
+        [psobject]$Rule,
+        [hashtable]$Phase4Data = $null,
+        [hashtable]$AssignmentAnalysis = $null
+    )
+
+    $trigger   = $Rule.trigger
+    $source    = "$($trigger.source)"
+    $operator  = "$($trigger.operator)"
+    $threshold = [double]$trigger.threshold
+
+    $collection = @(Get-Phase4Collection -Source $source `
+        -Phase4Data $Phase4Data `
+        -AssignmentAnalysis $AssignmentAnalysis)
+
+    if ($collection.Count -eq 0) { return $null }
+
+    $rowCondition = $null
+    if ($trigger.PSObject.Properties['rowCondition']) {
+        $rowCondition = $trigger.rowCondition
+    }
+
+    $matchCount = 0
+    if ($null -eq $rowCondition) {
+        # No per-row condition — all rows count
+        $matchCount = $collection.Count
+    } else {
+        foreach ($row in $collection) {
+            if (Test-Phase4RowCondition -Row $row -Condition $rowCondition) {
+                $matchCount++
+            }
+        }
+    }
+
+    $total = $collection.Count
+    $ratio = if ($total -gt 0) { $matchCount / $total } else { 0.0 }
+
+    $fired = switch ($operator) {
+        'count_gte'   { $matchCount -ge $threshold }
+        'count_gt'    { $matchCount -gt  $threshold }
+        'percent_gte' { ($total -gt 0) -and ($ratio -ge $threshold) }
+        'percent_gt'  { ($total -gt 0) -and ($ratio -gt  $threshold) }
+        default       { $matchCount -ge $threshold }
+    }
+
+    if (-not $fired) { return $null }
+
+    return New-Finding -Rule $Rule -Category 'structural' `
+        -AffectedCount $matchCount -Total $total -Ratio $ratio
 }
 
 function Invoke-NamingConventionFinding {

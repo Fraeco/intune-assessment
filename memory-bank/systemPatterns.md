@@ -42,8 +42,13 @@ This contract is the key extensibility pattern: if a new reader emits this shape
 ## Findings Pattern
 `RecommendationEngine.psm1` is config-driven via `FindingRules.json` and risk tiebreakers from `DomainMapping.json`:
 - Categories: comparison, structural, inventory
-- Trigger types include `keyword_cluster`, `domain_ratio`, `naming_convention`, `duplicate_coverage`, `inventory_metric`, `inventory_empty`
-- Findings sort by severity score then domain risk weight
+- Trigger types:
+  - Comparison: `keyword_cluster`, `domain_ratio`
+  - Structural: `naming_convention`, `duplicate_coverage`, `phase4_metric`, `phase4_collection`
+  - Inventory: `inventory_metric`, `inventory_empty`
+- `phase4_metric` supports operators `count_gte`, `count_gt`, `percent_gte`, `percent_gt`. Percent operators require an additional `denominator` field referencing another field on the same Phase 4 summary (e.g. `AppsWithFailures` over `AppCount`).
+- `phase4_collection` iterates Phase 4 collections and counts rows passing a per-row condition. Sources: `appInstallAggregate`, `policyStatusOverview`, `deviceAssignmentStatus`, `policyAssignmentSummary`, `unassignedPolicies`, `potentiallyDeadPolicies`. Per-row condition supports operators `eq`, `ne`, `gte`, `gt`, `lte`, `lt`, `contains`, `startswith`, `endswith`. Aggregate operators: `count_gte`, `count_gt`, `percent_gte`, `percent_gt`.
+- Findings sort by severity score then domain risk weight.
 
 ## OS Lifecycle Enrichment Pattern (Phase 2.1)
 - `OsLifecycleProvider.psm1` resolves OS metadata with Graph-first, static-fallback behavior.
